@@ -21,6 +21,7 @@ import { MultiDimComponent } from './components/charts/multi-dim/multi-dim.compo
 import { LaunchControlBarComponent } from './components/launch-control-bar/launch-control-bar.component';
 import { DownloadPopUp } from './components/download-pop-up/download-pop-up.component';
 import { MainComponent } from './components/main/main.component';
+import { HypImpComponent } from './components/charts/hyp-imp/hyp-imp.component';
 
 
 @NgModule({ 
@@ -35,7 +36,8 @@ import { MainComponent } from './components/main/main.component';
     MultiDimComponent,
     LaunchControlBarComponent,
     DownloadPopUp,
-    MainComponent
+    MainComponent,
+    HypImpComponent
   ],
   imports: [
     BrowserModule, HttpModule,
