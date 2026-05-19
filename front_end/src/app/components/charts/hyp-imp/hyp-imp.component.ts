@@ -8,6 +8,8 @@ import { MainEvent } from '../../../data/client-enums';
 
 //import { ExperimentDescription } from '../../../data/experimentDescription.model';
 
+import { OptunaService } from '../../../core/services/optuna-service.service';
+
 @Component({
   selector: 'hyp-imp',
   templateUrl: './hyp-imp.component.html',
@@ -15,20 +17,45 @@ import { MainEvent } from '../../../data/client-enums';
 })
 export class HypImpComponent implements OnInit {
 
-  //@ViewChild('importance') importance: ElementRef;
+  importances: any;
+  trials: any;
 
-  constructor(private ioMain: MainEventService) {
+  @ViewChild('importance') importance: ElementRef;
+
+  constructor(private ioMain: MainEventService, private optunaService: OptunaService) {
   }
 
-  ngOnInit() {
-    //this.initMainEvents();
+  async ngOnInit() {
+    this.initMainEvents();
+    await this.optunaService.init();
   }
-  /*
+
+  async calculateImportances() {
+    this.importances = await this.optunaService.runPythonWithParams(
+      `
+      # wie genau kann ein neuer trial erstellt werden?
+      # wie kann ich diese hinzufügen?
+      import optuna 
+
+      def getImportances(trials):
+          study = optuna.create_study()
+          study.add_trials(trials)
+          # Returns a dict where the keys are parameter names and the values are assessed importances.
+          # Return type: dict[str, float]
+          result = optuna.importance.get_param_importances(study)
+          return result
+
+      getImportances(input_data)
+      `,
+      this.trials);
+  }
+  
   private initMainEvents(): void {
       this.ioMain.onEvent(MainEvent.EXPERIMENT)
         .subscribe((message: any) => {
           if (message.headers['message_subtype'] === 'description') {
-            null;
+            this.trials.clear();
+            this.importances.clear();
           }
         });
   
@@ -78,5 +105,5 @@ export class HypImpComponent implements OnInit {
     ];
 
     Plotly.react(element, data);
-  }*/
+  }
 }
