@@ -34,9 +34,9 @@ export class OptunaService {
     const result = await this.pyodide.runPythonAsync(code);
 
     // Rückgabe konvertieren
-    if (result?.toJs) {
+    /*if (result?.toJs) {
       return result.toJs();
-    }
+    }*/
 
     return result;
   }
