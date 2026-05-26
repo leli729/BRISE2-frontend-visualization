@@ -1,43 +1,90 @@
-/*import { Injectable } from '@angular/core';
+declare global {
+  interface Window {
+    loadPyodide: any;
+  }
+}
 
-declare var loadPyodide: any;
-
-@Injectable({
-  providedIn: 'root'
-})
 export class OptunaService {
-
   pyodide: any;
-  constructor() { }
 
-  async init() {
-
-    this.pyodide = await loadPyodide({
-      indexURL: "https://cdn.jsdelivr.net/pyodide/v0.25.0/full/"
-    });
-
+  constructor() {
+    this.pyodide = null;
   }
 
+  // ---------------------------------------------------
+  // INIT PYODIDE
+  // ---------------------------------------------------
+  async init() {
+    if (this.pyodide) return
+
+    console.log("🔥 loading Pyodide...")
+
+    this.pyodide = await window.loadPyodide({
+    indexURL: "https://cdn.jsdelivr.net/pyodide/v0.25.0/full/"
+    })
+
+    console.log("✅ Pyodide loaded")
+
+    // --------------------------------------------------
+    // Load sklearn from Pyodide package repository
+    // --------------------------------------------------
+
+    console.log("🔥 loading scikit-learn...")
+
+    await this.pyodide.loadPackage("scikit-learn")
+
+    console.log("✅ scikit-learn loaded")
+
+    // --------------------------------------------------
+    // Install micropip
+    // --------------------------------------------------
+
+    await this.pyodide.loadPackage("micropip")
+
+    const micropip = this.pyodide.pyimport("micropip")
+
+    // --------------------------------------------------
+    // Install Optuna
+    // --------------------------------------------------
+
+    console.log("🔥 installing optuna...")
+
+    await micropip.install("optuna")
+
+    console.log("✅ Optuna installed")
+  }
+
+  // ---------------------------------------------------
+  // RUN RAW PYTHON
+  // ---------------------------------------------------
   async runPython(code: string): Promise<any> {
+    if (!this.pyodide) {
+      throw new Error("Pyodide not initialized. Call init() first.");
+    }
+
     return await this.pyodide.runPythonAsync(code);
   }
 
-  async runPythonWithParams(
-    code: string,
-    params: any
-  ): Promise<any> {
+  // ---------------------------------------------------
+  // RUN PYTHON WITH PARAMETERS
+  // ---------------------------------------------------
+  async runPythonWithParams(code: string, params: any): Promise<any> {
+    if (!this.pyodide) {
+      throw new Error("Pyodide not initialized. Call init() first.");
+    }
 
-    // Übergabe an Python
-    this.pyodide.globals.set("input_data", params);
+    // Pass JS object into Python
+    //this.pyodide.globals.set("input_data", params);
+    this.pyodide.globals.set("input_data", JSON.stringify(params))
 
-    // Python ausführen
     const result = await this.pyodide.runPythonAsync(code);
 
-    // Rückgabe konvertieren
-      if (result?.toJs) {
+    // Convert PyProxy → JS
+    if (result && typeof result.toJs === "function") {
       return result.toJs();
     }
 
     return result;
   }
-}*/
+}
+
