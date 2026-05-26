@@ -7,7 +7,6 @@ import { storeToRefs } from 'pinia'
 import Plotly from 'plotly.js-dist-min'
 
 import { MainEvent } from '../../../../entities/main'
-import type { Solution } from '../../../../entities/task/model/task-data.model';
 
 //service
 import { useMainEventStore } from '../../../../entities/main'
@@ -24,6 +23,7 @@ export interface InputData {
 }
 
 const optunaService = new OptunaService()
+
 const isVisible = ref(false)
 
 const trials = ref<Trial[]>([])
@@ -260,8 +260,6 @@ async function calculateImportances() {
       ` , 
       input_data.value   
     )
-    //importances.value = result.importances
-    //importances.value = result.get("importances")
     importances.value = Object.fromEntries(result.get("importances"))
 }
 
@@ -289,9 +287,7 @@ function initMainEvents() {
                     objectives: configuration.results
                 };
                trials.value.push(first_trial);
-               //input_data.value.trials.push(first_trial);
             })
-            //render() // render chart when all points got
         }
     })
 
@@ -305,10 +301,9 @@ function initMainEvents() {
                     objectives: configuration.results
                 };
                trials.value.push(last_trial); 
-               //input_data.value.trials.push(last_trial);
             });
         }
-        render() // Render chart when all points got
+        render() // Render chart only after last point got
     })
 
     // add new point
@@ -321,7 +316,6 @@ function initMainEvents() {
                     objectives: configuration.results
                 };
                trials.value.push(new_trial);
-               //input_data.value.trials.push(new_trial);
             })
         }
 
@@ -344,6 +338,38 @@ async function render() {
     } catch(e) {
         console.error("❌ Pyodide crashed:", e)
     }
+
+    const labels = Object.keys(importances.value)
+    const values = Object.values(importances.value)
+
+    const data = [
+        {          
+            x: labels,
+            y: values,
+            type: 'bar' as const
+        }
+    ]
+
+    const layout = {
+        title: {
+            text: 'Hyperparameter Importances'
+        },
+        autosize: true,
+        xaxis: {
+            title: {
+                text: 'Hyperparameters'
+            }
+        },
+
+        yaxis: {
+            title: {
+                text: 'Importance'
+            },
+            range: [0, 1]
+        }
+    }
+    if (element)
+        Plotly.react(element, data, layout);
 }
 </script>
 
