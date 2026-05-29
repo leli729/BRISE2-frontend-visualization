@@ -39,6 +39,8 @@ const input_data = computed(() => ({
 const importances = ref<Record<string, number>>({})
 const isPyodideReady = ref(false)
 
+const initialized = ref(false)
+
 async function initPyodide() {
     await optunaService.init()
     isPyodideReady.value = true
@@ -47,8 +49,22 @@ async function initPyodide() {
 }
 
 onMounted(() => {
-    initMainEvents()     
-    initPyodide()        
+    watch(experiment_description, () => {
+        if (initialized.value) {
+            return
+            }
+        const selectedHyperparameterImportances = experiment_description.value?.PlotSelection?.Plot?.HyperparameterImportances
+        if (!selectedHyperparameterImportances) {
+            return
+            }
+        initialized.value = true
+        initPyodide() 
+        initMainEvents() 
+    }),
+    {
+        immediate: true,
+        deep: true
+    }         
 })
 
 async function calculateImportances() {
@@ -65,10 +81,6 @@ async function calculateImportances() {
         import json
 
         input_data = json.loads(input_data)
-
-        print("inside python:")
-        print(input_data)
-        print(len(input_data["trials"]))
 
         # ============================================================
         # BUILD OPTUNA DISTRIBUTIONS
@@ -303,7 +315,9 @@ function initMainEvents() {
                trials.value.push(last_trial); 
             });
         }
-        render() // Render chart only after last point got
+        if (isPyodideReady) {
+            render() // Render chart if pyodide ready
+        }
     })
 
     // add new point
@@ -317,8 +331,10 @@ function initMainEvents() {
                 };
                trials.value.push(new_trial);
             })
+            if (isPyodideReady) {
+                render()
+            }
         }
-
     })
 }
 
@@ -327,8 +343,8 @@ async function render() {
     const element = hypimp.value
     if (!element) return
 
-    if (trials.value.length === 0) {
-        console.warn("No trials yet")
+    if (trials.value.length <= 1) {
+        console.warn("Needs more than 1 trial to calculate importances. Currently 1 or 0.")
         return
     }
 

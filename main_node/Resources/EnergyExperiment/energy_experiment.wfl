@@ -867,3 +867,15 @@ DefaultConfigurationHandler ? {
     [Type = "random_default_config_handler"]
   }
 }
+
+// ----------------Plot Selection----------------
+PlotSelection {
+  or Plot {
+    ParallelCoordinates 
+    HyperparameterImportances 
+    ParetoFront 
+    OptimizationHistory 
+    [if size childs.Context.TaskConfiguration.Objectives < 2 
+    then self excludes ParetoFront]
+  }
+}

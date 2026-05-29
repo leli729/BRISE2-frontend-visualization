@@ -25,33 +25,16 @@ export class OptunaService {
 
     console.log("✅ Pyodide loaded")
 
-    // --------------------------------------------------
-    // Load sklearn from Pyodide package repository
-    // --------------------------------------------------
-
-    console.log("🔥 loading scikit-learn...")
-
-    await this.pyodide.loadPackage("scikit-learn")
-
-    console.log("✅ scikit-learn loaded")
-
-    // --------------------------------------------------
-    // Install micropip
-    // --------------------------------------------------
-
     await this.pyodide.loadPackage("micropip")
 
     const micropip = this.pyodide.pyimport("micropip")
 
-    // --------------------------------------------------
-    // Install Optuna
-    // --------------------------------------------------
+    console.log("🔥 installing full ML stack...")
 
-    console.log("🔥 installing optuna...")
-
+    await micropip.install("scikit-learn")
     await micropip.install("optuna")
 
-    console.log("✅ Optuna installed")
+    console.log("✅ ML stack ready")
   }
 
   // ---------------------------------------------------

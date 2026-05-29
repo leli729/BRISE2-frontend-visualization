@@ -228,5 +228,10 @@
                 "TimeUnit": "seconds"
             }
         }
+    },
+    "PlotSelection": {
+    	"Plot": {
+    	    "HyperparameterImportances": {}
+    	}
     }
 }
