@@ -49,6 +49,7 @@ async function initPyodide() {
 }
 
 onMounted(() => {
+    initPyodide()
     watch(experiment_description, () => {
         if (initialized.value) {
             return
@@ -57,8 +58,7 @@ onMounted(() => {
         if (!selectedHyperparameterImportances) {
             return
             }
-        initialized.value = true
-        initPyodide() 
+        initialized.value = true 
         initMainEvents() 
     }),
     {
@@ -80,7 +80,8 @@ async function calculateImportances() {
         create_trial = optuna.trial.create_trial
         import json
 
-        input_data = json.loads(input_data)
+        if isinstance(input_data, str):
+            input_data = json.loads(input_data)
 
         # ============================================================
         # BUILD OPTUNA DISTRIBUTIONS
