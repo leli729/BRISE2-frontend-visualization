@@ -239,12 +239,13 @@
     "PlotSelection": {
         "Plot": {
             "OptimizationHistory": {},
-            "ContourPlot": {},
             "ParallelCoordinates": {},
             "RankPlot": {},
+            "HyperparameterImportances": {},
             "SlicePlot": {},
+            "ContourPlot": {},
             "EDFPlot": {},
-            "HyperparameterImportances": {}
+            "Heatmap": {}
         }
     }
 }
