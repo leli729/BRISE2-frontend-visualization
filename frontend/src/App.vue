@@ -7,6 +7,7 @@ import logo from './assets/logo.svg'
 import { LaunchControl } from './widgets/control-bar'
 import { InfoBoard } from './widgets/info-board'
 import { TaskList } from './widgets/task-list'
+import { AppFooter } from './widgets/footer'
 import { Heatmap } from './widgets/charts/heatmap'
 // HeatmapReg is disabled: main-node never publishes a "predictions" message (see front_API.py's
 // SUPPORTED_MESSAGES / APIMessageBuilder - "PREDICTIONS" is registered but nothing ever sends it),
@@ -271,7 +272,7 @@ watch(
             BRISE Dashboard
           </div>
 
-          <div class=" text-green-darken-2 d-none d-md-block text-caption">
+          <div class="text-medium-emphasis d-none d-md-block text-caption">
             Benchmark Reduction via Adaptive Instance
             Selection
           </div>
@@ -282,7 +283,7 @@ watch(
 
       <v-tabs
         v-model="tab"
-        color="green-darken-2"
+        color="primary"
         density="compact"
         class="d-none d-md-flex"
       >
@@ -372,7 +373,7 @@ watch(
               :label="chart"
               density="compact"
               hide-details
-              color="green-darken-2"
+              color="primary"
               :disabled="!canChangeVisibleCharts"
             />
           </v-list-item>
@@ -503,7 +504,7 @@ watch(
                       :label="param"
                       density="compact"
                       hide-details
-                      color="green-darken-2"
+                      color="primary"
                       :disabled="paraCoordParams.length === 1 && paraCoordParams.includes(param)"
                     />
                   </v-list-item>
@@ -587,7 +588,7 @@ watch(
                       :label="param"
                       density="compact"
                       hide-details
-                      color="green-darken-2"
+                      color="primary"
                     />
                   </v-list-item>
                 </v-list>
@@ -743,43 +744,12 @@ watch(
           </v-tabs-window-item>
         </v-tabs-window>
       </v-container>
+      <AppFooter />
     </v-main>
   </v-app>
 </template>
 
 <style scoped>
-.header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.title-container {
-  display: flex;
-  flex-direction: column;
-}
-
-.title-container p {
-  font-size: 55px;
-  font-weight: 450;
-  line-height: 54px;
-  letter-spacing: -0.25px;
-  color: black;
-
-}
-
-.description {
-  color: #2D6A27;
-  font-size: 0.9rem;
-  font-style: bold;
-
-}
-
-.logo {
-  width: 100%;
-  height: auto;
-}
-
 .user-input {
   margin: 10px
 }

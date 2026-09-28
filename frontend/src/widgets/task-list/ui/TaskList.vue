@@ -195,15 +195,20 @@ defineExpose({
             <v-chip
               v-for="(value, key) in normalizeConfigKeys(item.config)"
               :key="key"
+              prepend-icon="mdi-tune"
             >
               {{ key }}: {{ value }}
             </v-chip>
           </div>
 
           <v-list>
-            <v-list-item>Worker: {{ item.meta.worker }}</v-list-item>
-            <v-list-item>Repetitions {{ searchTasks(item.config).length }}</v-list-item>
-            <v-list-item>
+            <v-list-item prepend-icon="mdi-account-hard-hat">
+              Worker: {{ item.meta.worker }}
+            </v-list-item>
+            <v-list-item prepend-icon="mdi-check-all">
+              Repetitions {{ searchTasks(item.config).length }}
+            </v-list-item>
+            <v-list-item prepend-icon="mdi-sigma">
               Average result:
 
               <span
@@ -220,3 +225,10 @@ defineExpose({
     </v-card>
   </div>
 </template>
+
+<style scoped>
+:deep(tbody tr:hover) {
+  background-color: rgba(var(--v-theme-primary), 0.06);
+  border-left: 3px solid rgb(var(--v-theme-primary));
+}
+</style>
