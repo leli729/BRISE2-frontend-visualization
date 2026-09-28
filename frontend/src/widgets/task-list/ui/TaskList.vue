@@ -170,22 +170,45 @@ defineExpose({
         :headers="headers"
         :items="filteredResult"
       >
+        <!-- Task ID Column -->
+        <template #[`item.id`]="{ item }">
+          <v-chip
+            size="small"
+            color="secondary"
+            variant="tonal"
+            class="mono"
+            :title="item.id"
+          >
+            {{ item.id.toString().substring(0, 8) }}
+          </v-chip>
+        </template>
+
         <!-- Configuration Column -->
         <template #[`item.run`]="{ item }">
-          <span
-            v-for="(value, key) in normalizeConfigKeys(item.config)"
-            :key="key"
-          >
-            {{ (key) }} = {{ (value) }} ;
-          </span>
+          <div class="chip-group">
+            <v-chip
+              v-for="(value, key) in normalizeConfigKeys(item.config)"
+              :key="key"
+              size="small"
+              color="primary"
+              variant="tonal"
+            >
+              {{ key }}: {{ value }}
+            </v-chip>
+          </div>
         </template>
         <template #[`item.roundedResults`]="{ item }">
-          <span
-            v-for="(value, key) in normalizeConfigKeys(item.roundedResults)"
-            :key="key"
-          >
-            {{ key }} = {{ value }} ;
-          </span>
+          <div class="chip-group">
+            <v-chip
+              v-for="(value, key) in normalizeConfigKeys(item.roundedResults)"
+              :key="key"
+              size="small"
+              color="accent"
+              variant="tonal"
+            >
+              {{ key }}: {{ value }}
+            </v-chip>
+          </div>
         </template>
 
 
@@ -196,6 +219,8 @@ defineExpose({
               v-for="(value, key) in normalizeConfigKeys(item.config)"
               :key="key"
               prepend-icon="mdi-tune"
+              color="primary"
+              variant="tonal"
             >
               {{ key }}: {{ value }}
             </v-chip>
@@ -230,5 +255,16 @@ defineExpose({
 :deep(tbody tr:hover) {
   background-color: rgba(var(--v-theme-primary), 0.06);
   border-left: 3px solid rgb(var(--v-theme-primary));
+}
+
+.chip-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 6px 0;
+}
+
+.mono {
+  font-family: monospace;
 }
 </style>
