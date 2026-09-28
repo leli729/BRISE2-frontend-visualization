@@ -163,6 +163,7 @@ describe('renderRank', () => {
 
         expect(layout).toEqual(
             {
+                autosize: true,
                 title: {
                     text: "Rank Plot"
                 },

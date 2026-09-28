@@ -475,7 +475,7 @@ watch(
                 v-if="selected['Heatmap']"
                 v-show="visibleCharts.includes('Heatmap')"
                 cols="12"
-                md="8"
+                md="10"
                 class="pr-2"
               >
                 <Heatmap />
@@ -734,7 +734,7 @@ watch(
                 v-if="selected['Heatmap Reg']"
                 v-show="visibleCharts.includes('Heatmap Reg')"
                 cols="12"
-                md="8"
+                md="10"
                 class="pr-2"
               >
                 <HeatmapReg />

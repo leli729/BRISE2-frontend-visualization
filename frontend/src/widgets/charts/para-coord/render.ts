@@ -148,6 +148,7 @@ export function renderParaCoord(
     }];
 
     const layout = {
+        autosize: true,
         margin: {
             l: 150,
         },

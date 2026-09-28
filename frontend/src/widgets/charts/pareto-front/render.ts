@@ -55,8 +55,9 @@ export function renderParetoFront(
     }
 
     const layout = {
+        autosize: true,
         title: {
-            text: "Pareto Front" 
+            text: "Pareto Front"
         },
         xaxis: {
             title: {

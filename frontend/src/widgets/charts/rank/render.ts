@@ -120,6 +120,7 @@ export function renderRank(
     };
 
     const layout: Partial<Layout> = {
+        autosize: true,
         title: {
             text: "Rank Plot"
         },

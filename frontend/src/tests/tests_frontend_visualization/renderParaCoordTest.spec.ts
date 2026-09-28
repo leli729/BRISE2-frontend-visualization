@@ -145,6 +145,7 @@ describe('renderParaCoord', () => {
         const layout = call[2] as any
 
         expect(layout).toEqual({
+            autosize: true,
             margin: {
                 l: 150,
             },

@@ -129,8 +129,9 @@ describe('renderHypImp', () => {
         const layout = call[2] as any
 
         expect(layout).toEqual({
+            autosize: true,
             title: {
-                text: "Pareto Front" 
+                text: "Pareto Front"
             },
             xaxis: {
                 title: {
