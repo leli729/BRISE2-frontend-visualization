@@ -2,11 +2,11 @@ import numpy as np
 import logging
 
 import pandas as pd
-from typing import Dict, Tuple
+from typing import Dict, Optional, Tuple
 
 from configuration_selection.model.surrogate.surrogate_abs import Surrogate
 from core_entities.search_space import CategoricalHyperparameter
-from core_entities.objectives import Objectives
+from core_entities.objectives import Criterion, Objectives
 
 
 class MultiArmedBandit(Surrogate):
@@ -17,12 +17,16 @@ class MultiArmedBandit(Surrogate):
         self.multi_objective = surrogate_description['Instance']['MultiArmedBandit']['MultiObjective']
         self.c = surrogate_description['Instance']['MultiArmedBandit']['Parameters']['c']
 
+    def output_criteria(self) -> Optional[Tuple[Criterion, ...]]:
+        # an upper confidence bound, "optimism in the face of uncertainty": higher is better, whatever the labels' direction
+        return tuple(Criterion(criterion.name, minimization=False) for criterion in self._label_criteria())
+
     def create(self, features: pd.DataFrame, labels: pd.DataFrame) -> bool:
         if self.objective.minimization:
             raise TypeError("Multi Armed Bandit optimizer performs only maximization tasks!")
 
         transformed_features = self._transform_configuration(features)
-        transformed_labels = self._transform_values(labels)
+        transformed_labels = self._transform_values_to_maximize(labels)  # the rewards: a higher label is better
 
         objective_column: str = transformed_labels.keys()[0]  # by definition, this model works with solution improvement.
 

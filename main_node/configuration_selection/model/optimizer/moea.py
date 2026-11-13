@@ -115,9 +115,8 @@ class MOEA(Optimizer):
             population = pg.algorithm(algorithm).evolve(population)
 
         optimized_features = pd.DataFrame(population.get_x(), columns=self.params)
-        label_columns = ["Y"] if surrogate.scalarized else self.objectives.names
-        # pygmo minimizes, so the fitness of a maximized objective is negated; restore the predicted values
-        optimized_labels = pd.DataFrame(population.get_f() * problem.signs, columns=label_columns)
+        # pygmo minimizes, so the fitness of a maximized column is negated; restore the predicted values
+        optimized_labels = pd.DataFrame(population.get_f() * problem.signs, columns=[c.name for c in problem.criteria])
 
         for p, val_ind in self.masked_params.items():
             optimized_features.insert(loc=val_ind[1], column=p, value=val_ind[0])
@@ -125,7 +124,7 @@ class MOEA(Optimizer):
         optimized_features = self._inverse_transform_configuration(optimized_features)  # inverse transform
 
         result = optimized_features.join(optimized_labels)
-        return self._rank_candidates(result, label_columns)
+        return self._rank_candidates(result, problem.criteria)
 
     # TOBEDROPPED
     def _inverse_transform_configuration(self, optimized_features: pd.DataFrame) -> pd.DataFrame:
@@ -149,9 +148,8 @@ class MOEA(Optimizer):
             self._surrogate = surrogate
             self._optimizer: MOEA = optimizer
             self._bounds = self._optimizer.bounds
-            self._objectives = self._optimizer.objectives
-            label_columns = ["Y"] if surrogate.scalarized else self._objectives.names
-            self.signs = self._optimizer._get_direction_signs(label_columns)
+            self.criteria = self._optimizer.resolve_criteria(surrogate)
+            self.signs = np.array([criterion.sign for criterion in self.criteria])
             self._params = self._optimizer.params
 
         def fitness(self, x):
@@ -175,7 +173,7 @@ class MOEA(Optimizer):
             return (transformed_result.values * self.signs).flatten()
 
         def get_nobj(self):
-            return len(self._objectives) if not self._surrogate.scalarized else 1
+            return len(self.criteria)
 
         def get_bounds(self):
             return self._bounds

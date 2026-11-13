@@ -23,13 +23,11 @@ class RandomSearch(Optimizer):
         if not sampled:
             return pd.DataFrame()
 
+        criteria = self.resolve_criteria(surrogate)
         sampled_configurations = pd.concat(sampled, ignore_index=True)
         predicted_values = surrogate.predict_batch(sampled_configurations)
         labels = self._transform_values(predicted_values)
-        if len(self.value_transformers) > 0:
-            names = ["Y"] if surrogate.scalarized else self.objectives.names
-            if len(names) == len(labels.columns):
-                labels.columns = names
+        labels.columns = [criterion.name for criterion in criteria]
 
         predicted = sampled_configurations.join(labels)
-        return self._rank_candidates(predicted, list(labels.columns))
+        return self._rank_candidates(predicted, criteria)

@@ -1,8 +1,8 @@
 import pandas as pd
-from typing import Tuple
+from typing import Optional, Tuple
 
 from configuration_selection.model.surrogate.surrogate_abs import Surrogate
-from core_entities.objectives import Objectives
+from core_entities.objectives import Criterion, Objectives
 
 
 class CompositeSurrogate(Surrogate):
@@ -19,6 +19,12 @@ class CompositeSurrogate(Surrogate):
         self.multi_objective = True
         if surrogates:
             self.mapping_config_transformer_parameter = surrogates[0].mapping_config_transformer_parameter
+
+    def output_criteria(self) -> Optional[Tuple[Criterion, ...]]:
+        declarations = [s.output_criteria() for s in self.surrogates]
+        if any(declaration is None for declaration in declarations):
+            return None
+        return tuple(criterion for declaration in declarations for criterion in declaration)
 
     def create(self, features: pd.DataFrame, labels: pd.DataFrame) -> bool:
         is_built = []

@@ -5,21 +5,29 @@ from typing import Dict, Iterator, List, Mapping, Tuple
 
 
 @dataclass(frozen=True)
-class Objective:
+class Criterion:
+    """
+    A value that candidates are ranked by, with the direction it is ranked in: an objective, or a value derived from
+    objectives (the scalarized Y, the ratio of an acquisition function, the upper confidence bound of a bandit).
+    """
+    name: str
+    minimization: bool
+
+    @property
+    def sign(self) -> float:
+        """1 for a minimized criterion, -1 for a maximized one: value * sign is to be minimized."""
+        return 1.0 if self.minimization else -1.0
+
+
+@dataclass(frozen=True)
+class Objective(Criterion):
     """
     One objective of the optimization problem, as declared in the Experiment Description
     (Context.TaskConfiguration.Objectives).
     """
-    name: str
-    minimization: bool
     data_type: str
     min_expected_value: float
     max_expected_value: float
-
-    @property
-    def sign(self) -> float:
-        """1 for a minimized objective, -1 for a maximized one: value * sign is to be minimized."""
-        return 1.0 if self.minimization else -1.0
 
     @property
     def expected_range(self) -> Tuple[float, float]:

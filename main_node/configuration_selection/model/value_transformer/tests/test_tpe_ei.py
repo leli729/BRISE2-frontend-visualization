@@ -4,7 +4,7 @@ import pytest
 from configuration_selection.model.value_transformer.tpe_ei import TpeEi
 from core_entities.objectives import Objectives
 
-# rows of (probability_good, probability_bad); the last one has no finite ratio when minimizing
+# rows of (probability_good, probability_bad); the last one has no good density; the ratio is good / bad
 PROBABILITIES = pd.DataFrame({"Y1_probability_good": [0.5, 0.2, 0.0], "Y1_probability_bad": [0.1, 0.4, 0.3]})
 
 
@@ -16,13 +16,23 @@ def _acquisition_function(minimization):
 
 class TestTpeEi:
 
-    @pytest.mark.parametrize("minimization, expected", [(True, [0.2, 2.0, 0.0]), (False, [5.0, 0.5, 0.0])])
-    def test_each_row_of_a_batch_gets_its_own_ratio(self, minimization, expected):
+    @pytest.mark.parametrize("minimization", [True, False])
+    def test_each_row_of_a_batch_gets_its_own_ratio_of_good_to_bad_whatever_the_direction(self, minimization):
         acquisition_function = _acquisition_function(minimization)
 
         batch = acquisition_function.transform(PROBABILITIES)["ratio"].tolist()
         rows = [acquisition_function.transform(PROBABILITIES.iloc[[i]].reset_index(drop=True))["ratio"].iloc[0]
                 for i in range(len(PROBABILITIES))]
 
-        assert batch == pytest.approx(expected)
-        assert rows == pytest.approx(expected)
+        assert batch == pytest.approx([5.0, 0.5, 0.0])
+        assert rows == pytest.approx([5.0, 0.5, 0.0])
+
+    @pytest.mark.parametrize("minimization", [True, False])
+    def test_a_row_without_a_finite_ratio_gets_its_good_density_whatever_the_direction(self, minimization):
+        # no observation of the bad group has this value: the ratio is infinite, and a higher value ranks better; a TPE never
+        # produces this, since it floors both densities at 1e-32, so it checks TpeEi as a unit
+        probabilities = pd.DataFrame({"Y1_probability_good": [0.5], "Y1_probability_bad": [0.0]})
+
+        ratio = _acquisition_function(minimization).transform(probabilities)["ratio"].tolist()
+
+        assert ratio == pytest.approx([0.5])

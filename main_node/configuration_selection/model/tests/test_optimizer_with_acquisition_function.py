@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import pytest
 
 from core_entities.objectives import Objectives
 from core_entities.search_space import FloatHyperparameter
@@ -33,15 +34,25 @@ class TestRandomSearchWithTreeParzenEstimator:
         assert surrogate.create(pd.DataFrame({"x": values}), pd.DataFrame({"Y1": values}))
         return surrogate
 
-    def test_candidates_are_scored_by_the_acquisition_function_and_returned_best_first(self):
-        objectives = _objectives(True)
+    @staticmethod
+    def _optimized(minimization: bool):
+        objectives = _objectives(minimization)
         description = {"Instance": {"RandomSearch": {"SamplingSize": 60}},
                        "ValueTransformers": {"AcquisitionFunction": {"TPE_EI": {"Type": "tpe_ei"}}}}
         optimizer = RandomSearch(description, (X,), objectives)
+        return optimizer.optimize(TestRandomSearchWithTreeParzenEstimator._trained_surrogate(objectives))
 
-        result = optimizer.optimize(self._trained_surrogate(objectives))
+    @pytest.mark.parametrize("minimization", [True, False])
+    def test_candidates_are_scored_by_the_acquisition_function_and_returned_best_first(self, minimization):
+        result = self._optimized(minimization)
 
         assert "Y1" in result.columns  # the score is reported under the objective, where the model reads it
         assert "Y1_probability_good" not in result.columns
-        assert result["Y1"].is_monotonic_increasing
-        assert result.iloc[0]["x"] < 0.15  # the objective is minimized and the best observations have a small x
+        assert result["Y1"].is_monotonic_decreasing  # the score is the ratio of good to bad, the highest first
+
+    def test_the_best_candidate_has_a_small_x_when_the_objective_is_minimized(self):
+        # the observations are x = 0..1 with Y1 = x, so the best ones are at the low end
+        assert self._optimized(minimization=True).iloc[0]["x"] < 0.15
+
+    def test_the_best_candidate_has_a_large_x_when_the_objective_is_maximized(self):
+        assert self._optimized(minimization=False).iloc[0]["x"] > 0.85

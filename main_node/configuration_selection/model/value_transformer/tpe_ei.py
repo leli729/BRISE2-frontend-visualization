@@ -30,17 +30,18 @@
 
 import pandas as pd
 import numpy as np
-from typing import Dict
+from typing import Dict, Optional, Sequence, Tuple
 
 from configuration_selection.model.value_transformer.acquisition_function_abs import AcquisitionFunction
-from core_entities.objectives import Objectives
+from core_entities.objectives import Criterion, Objectives
 
 
 class TpeEi(AcquisitionFunction):
     def __init__(self, value_transformer_description: Dict, objectives: Objectives):
         super().__init__(value_transformer_description, objectives)
-        self.objective = next(iter(self.objectives))
-        self.is_minimization = self.objective.minimization
+
+    def transform_criteria(self, criteria: Optional[Sequence[Criterion]]) -> Tuple[Criterion, ...]:
+        return (Criterion("ratio", minimization=False),)
 
     def transform(self, objective_function_values: pd.DataFrame) -> pd.DataFrame:
         names = objective_function_values.columns.tolist()
@@ -55,10 +56,7 @@ class TpeEi(AcquisitionFunction):
         if good is None or bad is None:
             raise ValueError("Check Tree Parzen Estimator implementation for output columns!")
 
-        if self.is_minimization:
-            ratio = bad / good
-        else:
-            ratio = good / bad
+        ratio = good / bad  # the higher, the better, whatever the direction of the objective
 
         # Applies if prediction is infinity.
         # right now, this happens because a KDE does not contain all values for a categorical parameter

@@ -77,7 +77,7 @@ class TestRandomSearchRanking:
 
         candidates = pd.DataFrame({"x": [0.1, 0.5, 0.9, 0.6], "Y1": [0.1, 0.5, 0.9, 0.6], "Y2": [0.9, 0.5, 0.1, 0.6]})
 
-        ranked = optimizer._rank_candidates(candidates, ["Y1", "Y2"])
+        ranked = optimizer._rank_candidates(candidates, tuple(objectives))
 
         assert ranked["x"].iloc[-1] == 0.6  # the dominated candidate comes last
         assert set(ranked["x"].iloc[:3]) == {0.1, 0.5, 0.9}

@@ -1,12 +1,12 @@
 import pandas as pd
-from typing import Dict, Tuple, Mapping
+from typing import Dict, Optional, Tuple, Mapping
 from abc import ABC, abstractmethod
 
 from configuration_selection.model.value_transformer.value_transformer_orchestrator import ValueTransformerOrchestrator
 from configuration_selection.model.configuration_transformer.configuration_transformer_abs import ConfigurationTransformer
 from configuration_selection.model import configuration_transformation
 from core_entities.search_space import Hyperparameter, find_parameters_activated_within_region
-from core_entities.objectives import Objectives
+from core_entities.objectives import Criterion, Objectives
 
 
 class Surrogate(ABC):
@@ -69,9 +69,32 @@ class Surrogate(ABC):
         """
         pass
 
+    def _label_criteria(self) -> Tuple[Criterion, ...]:
+        """
+        :return: the declarations of the labels after the value transformers of the surrogate.
+        """
+        criteria = tuple(self.objectives)
+        for value_transformer in self.value_transformers:
+            criteria = value_transformer.transform_criteria(criteria)
+        return criteria
+
+    def output_criteria(self) -> Optional[Tuple[Criterion, ...]]:
+        """
+        :return: the declaration of each column `predict` returns, with the direction candidates are ranked in; None if
+        the columns have no rankable direction.
+        """
+        return self._label_criteria()
+
     def _transform_configuration(self, features: pd.DataFrame) -> pd.DataFrame:
         return configuration_transformation.transform(
             features, self.mapping_config_transformer_parameter, self.parameters_activated_within_region)
+
+    def _transform_values_to_maximize(self, labels: pd.DataFrame) -> pd.DataFrame:
+        """
+        :return: the transformed labels, each column oriented so that a higher value is better, by its declared direction.
+        """
+        orientation = [-criterion.sign for criterion in self._label_criteria()]
+        return self._transform_values(labels) * orientation
 
     def _transform_values(self, labels: pd.DataFrame) -> pd.DataFrame:
         transformed_labels = pd.DataFrame()

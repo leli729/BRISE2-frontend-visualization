@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 import pygmo as pg
-from typing import Dict, List, Tuple, Mapping
+from typing import Dict, Sequence, Tuple, Mapping
 from abc import ABC, abstractmethod
 
 from configuration_selection.model.value_transformer.value_transformer_orchestrator import ValueTransformerOrchestrator
@@ -9,7 +9,7 @@ from configuration_selection.model.configuration_transformer.configuration_trans
 from configuration_selection.model.surrogate.surrogate_abs import Surrogate
 from configuration_selection.model import configuration_transformation
 from core_entities.search_space import Hyperparameter
-from core_entities.objectives import Objectives
+from core_entities.objectives import Criterion, Objectives
 
 
 class Optimizer(ABC):
@@ -43,30 +43,38 @@ class Optimizer(ABC):
         """
         pass
 
-    def _get_direction_signs(self, label_columns: List[str]) -> np.ndarray:
+    def resolve_criteria(self, surrogate: Surrogate) -> Tuple[Criterion, ...]:
         """
-        Gives the direction of each column as a sign.
-        :param label_columns: columns holding the (value-transformed) predictions of candidates: objective names, or the
-        single column produced by a value transformer.
-        :return: +1 for a column to be minimized and -1 for one to be maximized, so that multiplying a column by its
-        sign makes it a column to be minimized. A column that is not an objective follows the direction of the first
-        objective.
+        Resolves the direction of every column the candidates are ranked by: what the surrogate declares, mapped by the
+        value transformers of the optimizer. A column of a value transformer is reported under the name of the objective
+        (or "Y" if the surrogate scalarizes), keeping its direction.
+        :param surrogate: the surrogate that predicts the candidates.
+        :return: one criterion per ranked column, named as the column.
+        :raises ValueError: if the surrogate predicts columns without a direction that no value transformer gives one.
         """
-        first_objective = next(iter(self.objectives))
-        return np.array([(self.objectives.by_name(column) if column in self.objectives.names else first_objective).sign
-                         for column in label_columns])
+        criteria = surrogate.output_criteria()
+        for value_transformer in self.value_transformers:
+            criteria = value_transformer.transform_criteria(criteria)
+        if criteria is None:
+            raise ValueError(f"The columns {type(surrogate).__name__} predicts have no direction to rank candidates by: "
+                             f"an acquisition function has to turn them into a score.")
+        if self.value_transformers:
+            names = ["Y"] if surrogate.scalarized else self.objectives.names
+            if len(names) == len(criteria):
+                criteria = tuple(Criterion(name, criterion.minimization) for name, criterion in zip(names, criteria))
+        return tuple(criteria)
 
-    def _rank_candidates(self, candidates: pd.DataFrame, label_columns: List[str]) -> pd.DataFrame:
+    def _rank_candidates(self, candidates: pd.DataFrame, criteria: Sequence[Criterion]) -> pd.DataFrame:
         """
         Sorts candidates by their predicted quality, the best first, each column in its own direction.
         :param candidates: parameter values of candidates, followed by their predictions.
-        :param label_columns: names of the columns that hold the predictions to rank: one per objective,
-        or the single column of a value transformer.
+        :param criteria: the columns that hold the predictions to rank, with their directions.
         :return: the same candidates, reordered, with a default index.
         """
         if candidates.empty:
             return candidates
-        values_to_minimize = candidates[label_columns].to_numpy(dtype=float) * self._get_direction_signs(label_columns)
+        label_columns = [criterion.name for criterion in criteria]
+        values_to_minimize = candidates[label_columns].to_numpy(dtype=float) * np.array([c.sign for c in criteria])
         if len(label_columns) == 1:
             order = np.argsort(values_to_minimize[:, 0], kind="stable")
         else:

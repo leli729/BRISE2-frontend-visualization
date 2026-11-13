@@ -31,7 +31,7 @@
 import pandas as pd
 import numpy as np
 import statsmodels.api as sm
-from typing import Dict, Tuple
+from typing import Dict, Optional, Tuple
 
 from core_entities.search_space import (
     Hyperparameter,
@@ -39,7 +39,7 @@ from core_entities.search_space import (
     NumericHyperparameter,
     OrdinalHyperparameter
 )
-from core_entities.objectives import Objectives
+from core_entities.objectives import Criterion, Objectives
 from configuration_selection.model.surrogate.surrogate_abs import Surrogate
 
 
@@ -53,6 +53,10 @@ class TreeParzenEstimator(Surrogate):
         self.kde_vartypes = ""
         self.varsizes = []
         self.model = {}
+
+    def output_criteria(self) -> Optional[Tuple[Criterion, ...]]:
+        # the densities of the good and the bad group have no direction: an acquisition function must turn them into a score
+        return None
 
     def create(self, features: pd.DataFrame, labels: pd.DataFrame) -> bool:
         is_built = False
@@ -69,10 +73,11 @@ class TreeParzenEstimator(Surrogate):
             return is_built
 
         transformed_features = self._transform_configuration(features)
-        transformed_labels = self._transform_values(labels)
+        transformed_labels = self._transform_values_to_maximize(labels)
         transformed_labels.reset_index(inplace=True, drop=True)  # reindex, since transformation changes indices
 
-        sorted_labels = labels.sort_values(by=transformed_labels.keys()[0], ascending=self.objective.minimization)
+        # the good observations are those with the highest labels, once oriented by their declared direction
+        sorted_labels = transformed_labels.sort_values(by=transformed_labels.keys()[0], ascending=False)
 
         t_features_good = transformed_features.iloc[sorted_labels[:n_good].index]
         t_features_bad = transformed_features.iloc[sorted_labels[n_good:].index]
