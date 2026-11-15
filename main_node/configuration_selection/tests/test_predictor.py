@@ -3,6 +3,7 @@ from types import SimpleNamespace
 import pandas as pd
 import pytest
 
+from configuration_selection.model.model import Model
 from configuration_selection.model.predictor import Predictor
 from core_entities.configuration import Configuration
 from tools.restore_db import RestoreDB
@@ -178,3 +179,135 @@ class TestPredictedConfigurationsHoldOnlyActiveParameters:
             self.BRANCH_PARAMETERS[f"{self.N0}.N01"], self.BRANCH_PARAMETERS[f"{self.N0}.N02"]]
         assert [c.parameters[f"{self.N0}.N01.F1"] for c in configurations[:1]] == [1.0]
         assert [c.predicted_result for c in configurations] == [[0.5], [0.6]]
+
+
+class TestPredictionInfoNamesTheModelsThatPredictedTheConfiguration:
+    """
+    A configuration's prediction information holds the models that predicted it, with their build time, and a model
+    combination is dumped only when every level's model predicted. Before each test, every model gets the description
+    and build time that an earlier successful call leaves behind (EARLIER_CALL).
+    'test_case_13' is flat (one region), 'test_case_11' hierarchical: region 0 is the root (N0), region 1 the branch N01
+    (F1, N1), region 2 the branch N02 (I1, O1).
+    """
+
+    N0 = "Context.SearchSpace.N0"
+    NO_MODEL = {"Model": [], "time_to_build": 0}
+    EARLIER_CALL = {"Model": [{"Surrogate": "built in an earlier call"}], "time_to_build": 1.0}
+    BUILT = {"Model": [{"Surrogate": "built in this call"}], "time_to_build": 2.0}
+
+    @pytest.fixture(autouse=True)
+    def _database(self):
+        rdb.cleanup()
+        rdb.restore()
+
+    @classmethod
+    def _predictor_with_models_built_earlier(cls, get_experiment, test_case):
+        description, search_space = get_experiment(test_case)
+        predictor = Predictor("experiment_id", description, search_space)
+        for model in predictor.mapping_region_model.values():
+            descriptions = list(cls.EARLIER_CALL["Model"])
+            model.created_surrogates_descriptions_and_objectives_and_optimizer_descriptions = descriptions
+            model.time_to_build = cls.EARLIER_CALL["time_to_build"]
+        return predictor
+
+    @classmethod
+    def _predict_as_built_in_this_call(cls, proposal):
+        """A model's predict that builds and proposes, setting its per-call attributes as the real one does."""
+        def predict(model, parameters, configurations):
+            model.created_surrogates_descriptions_and_objectives_and_optimizer_descriptions = list(cls.BUILT["Model"])
+            model.time_to_build = cls.BUILT["time_to_build"]
+            return proposal
+        return predict
+
+    def _proposal(self):
+        n0 = self.N0
+        return pd.DataFrame([{n0: f"{n0}.N01", f"{n0}.N01.F1": 1.0, f"{n0}.N01.N1": f"{n0}.N01.N1.N11",
+                              f"{n0}.N02.I1": 11, f"{n0}.N02.O1": f"{n0}.N02.O1.O11", "Y1": 0.5}])
+
+    def _hierarchical_predict(self, predictor, branch_proposes):
+        """The root's model proposes the branch N01; the branch's model proposes too, or fails."""
+        n0 = self.N0
+        root = predictor.search_space.regions[0]
+        predict_root = self._predict_as_built_in_this_call(pd.DataFrame([{n0: f"{n0}.N01", "Y1": 0.5}]))
+        predict_branch = self._predict_as_built_in_this_call(
+            pd.DataFrame([{f"{n0}.N01.F1": 1.0, f"{n0}.N01.N1": f"{n0}.N01.N1.N11", "Y1": 0.6}]))
+
+        def predict(model, parameters, configurations):
+            if model.region == root:
+                return predict_root(model, parameters, configurations)
+            if branch_proposes:
+                return predict_branch(model, parameters, configurations)
+            return pd.DataFrame()
+
+        return predict
+
+    def test_a_region_whose_model_proposes_nothing_reports_no_model_and_adds_no_dump(self, get_experiment, monkeypatch):
+        predictor = self._predictor_with_models_built_earlier(get_experiment, 13)
+        # patched on the class: the predictor pickles the model into the dumps, which an instance attribute would break;
+        # unlike the real predict, the fake keeps the earlier build's attributes: the predictor must not rely on a reset
+        monkeypatch.setattr(Model, "predict", lambda model, parameters, configurations: pd.DataFrame())
+
+        configurations = predictor.predict([_make_config({})])
+
+        assert [c.type for c in configurations] == [Configuration.Type.FROM_SELECTOR]
+        assert configurations[0].prediction_info == {"0": self.NO_MODEL}
+        assert predictor.hierarchical_models_dumps == []
+
+    @pytest.mark.parametrize("test_case", [13, 11])
+    def test_a_sampled_configuration_reports_no_model_and_adds_no_dump(self, get_experiment, test_case):
+        predictor = self._predictor_with_models_built_earlier(get_experiment, test_case)
+
+        configurations = predictor.predict([], True)
+
+        prediction_info = configurations[0].prediction_info
+        assert len(prediction_info) == predictor.search_space.number_of_levels  # one region per level is sampled
+        assert prediction_info == {region_index: self.NO_MODEL for region_index in prediction_info}
+        assert predictor.hierarchical_models_dumps == []
+
+    def test_a_predicting_model_reports_its_description_and_build_time_and_adds_its_dump(
+            self, get_experiment, monkeypatch):
+        predictor = self._predictor_with_models_built_earlier(get_experiment, 13)
+        monkeypatch.setattr(Model, "predict", self._predict_as_built_in_this_call(self._proposal()))
+
+        configurations = predictor.predict([_make_config({})])
+
+        assert [c.type for c in configurations] == [Configuration.Type.PREDICTED]
+        assert configurations[0].prediction_info == {"0": self.BUILT}
+        assert [len(dump) for dump in predictor.hierarchical_models_dumps] == [1]
+
+    def test_a_sampled_branch_reports_no_model_next_to_a_predicting_root_and_adds_no_dump(
+            self, get_experiment, monkeypatch):
+        predictor = self._predictor_with_models_built_earlier(get_experiment, 11)
+        monkeypatch.setattr(Model, "predict", self._hierarchical_predict(predictor, branch_proposes=False))
+
+        configurations = predictor.predict([_make_config({})])
+
+        assert [c.type for c in configurations] == [Configuration.Type.FROM_SELECTOR]
+        # the root's proposal is kept; the branch's parameters, which its model did not propose, come from the sampler
+        n0 = self.N0
+        assert configurations[0].parameters[n0] == f"{n0}.N01"
+        assert {f"{n0}.N01.F1", f"{n0}.N01.N1"} <= set(configurations[0].parameters)
+        assert configurations[0].prediction_info == {"0": self.BUILT, "1": self.NO_MODEL}
+        # a dump holds a model for every level, and the branch's model was not built in this call
+        assert predictor.hierarchical_models_dumps == []
+
+    def test_a_configuration_predicted_on_every_level_adds_one_dump_of_all_levels(
+            self, get_experiment, monkeypatch):
+        predictor = self._predictor_with_models_built_earlier(get_experiment, 11)
+        monkeypatch.setattr(Model, "predict", self._hierarchical_predict(predictor, branch_proposes=True))
+
+        configurations = predictor.predict([_make_config({})])
+
+        assert [c.type for c in configurations] == [Configuration.Type.PREDICTED]
+        assert configurations[0].prediction_info == {"0": self.BUILT, "1": self.BUILT}
+        assert [len(dump) for dump in predictor.hierarchical_models_dumps] == [2]
+
+    def test_a_model_that_builds_nothing_holds_no_description_or_build_time(self, get_experiment):
+        predictor = self._predictor_with_models_built_earlier(get_experiment, 13)
+        region, model = next(iter(predictor.mapping_region_model.items()))
+
+        candidates = model.predict(list(region), [])
+
+        assert candidates.empty
+        assert model.created_surrogates_descriptions_and_objectives_and_optimizer_descriptions == []
+        assert model.time_to_build is None

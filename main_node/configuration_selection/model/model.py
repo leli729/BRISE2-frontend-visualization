@@ -98,13 +98,15 @@ class Model:
         # transfer learning
         self.time_to_build = None
         self.created_surrogates_descriptions_and_objectives_and_optimizer_descriptions = []
-        self.model_dumps = None
 
     def predict(self, parameters: List[Hyperparameter], configurations: List[Configuration]) -> pd.DataFrame:
         """
         Encapsulates all model related functionality.
         """
-        self.created_surrogates_descriptions_and_objectives_and_optimizer_descriptions = []  # clean up descriptions for transfer learning
+        # the build time and descriptions describe the last call only (transfer learning), so a call that builds
+        # nothing leaves none
+        self.time_to_build = None
+        self.created_surrogates_descriptions_and_objectives_and_optimizer_descriptions = []
 
         # handle multiple objectives
         names_of_parameters = [p.name for p in parameters]

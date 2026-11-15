@@ -92,6 +92,7 @@ class Predictor:
             next_activated_regions: Set[Tuple[Hyperparameter]] = set()
             for region in activated_regions:
                 region_index = str(self.search_space.regions.index(region))
+                model_predicted = False  # the region's model proposed candidates in this call
                 if not sample:
                     considered_hp_names_in_region = [hp.name for hp in region]
                     considered_hp_names += considered_hp_names_in_region
@@ -123,6 +124,7 @@ class Predictor:
                             # since sampling has been used, there are no objective function values and merge is safe
                             predicted = pd.merge(predicted, multiplied_partial_configuration, left_index=True, right_index=True)
                     else:
+                        model_predicted = True
                         predicted = self._update_prediction(predicted, partial_configuration, region_index,
                                                                    considered_hp_names_in_region)
                 else:
@@ -137,12 +139,17 @@ class Predictor:
                 else:
                     next_activated_regions.update(self.search_space.activate_regions(predicted))
 
-                prediction_info[region_index] = {
-                    "Model": self.mapping_region_model[region].created_surrogates_descriptions_and_objectives_and_optimizer_descriptions,
-                    "time_to_build": self.mapping_region_model[region].time_to_build
-                    if self.mapping_region_model[region].time_to_build is not None else 0}
-                if self.mapping_region_model[region].time_to_build is not None:
-                    model_dump.append(pickle.dumps(self.mapping_region_model[region]))
+                # the model's descriptions and build time describe its last call: they belong to this configuration only
+                # if the model proposed it
+                if model_predicted:
+                    model = self.mapping_region_model[region]
+                    prediction_info[region_index] = {
+                        "Model": model.created_surrogates_descriptions_and_objectives_and_optimizer_descriptions,
+                        "time_to_build": model.time_to_build if model.time_to_build is not None else 0}
+                    if model.time_to_build is not None:
+                        model_dump.append(pickle.dumps(model))
+                else:
+                    prediction_info[region_index] = {"Model": [], "time_to_build": 0}
 
             activated_regions = next_activated_regions
         predicted_configurations = []
