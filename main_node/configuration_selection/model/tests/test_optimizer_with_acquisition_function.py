@@ -46,9 +46,10 @@ class TestRandomSearchWithTreeParzenEstimator:
     def test_candidates_are_scored_by_the_acquisition_function_and_returned_best_first(self, minimization):
         result = self._optimized(minimization)
 
-        assert "Y1" in result.columns  # the score is reported under the objective, where the model reads it
+        assert "ratio(Y1)" in result.columns  # the score is reported as the ratio it is, where the model reads it
+        assert "Y1" not in result.columns  # not as a value of the objective
         assert "Y1_probability_good" not in result.columns
-        assert result["Y1"].is_monotonic_decreasing  # the score is the ratio of good to bad, the highest first
+        assert result["ratio(Y1)"].is_monotonic_decreasing  # the score is the ratio of good to bad, the highest first
 
     def test_the_best_candidate_has_a_small_x_when_the_objective_is_minimized(self):
         # the observations are x = 0..1 with Y1 = x, so the best ones are at the low end

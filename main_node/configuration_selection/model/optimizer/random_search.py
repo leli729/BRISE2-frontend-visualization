@@ -27,7 +27,6 @@ class RandomSearch(Optimizer):
         sampled_configurations = pd.concat(sampled, ignore_index=True)
         predicted_values = surrogate.predict_batch(sampled_configurations)
         labels = self._transform_values(predicted_values)
-        labels.columns = [criterion.name for criterion in criteria]
 
         predicted = sampled_configurations.join(labels)
         return self._rank_candidates(predicted, criteria)

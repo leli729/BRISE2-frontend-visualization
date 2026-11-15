@@ -45,9 +45,9 @@ class Optimizer(ABC):
 
     def resolve_criteria(self, surrogate: Surrogate) -> Tuple[Criterion, ...]:
         """
-        Resolves the direction of every column the candidates are ranked by: what the surrogate declares, mapped by the
-        value transformers of the optimizer. A column of a value transformer is reported under the name of the objective
-        (or "Y" if the surrogate scalarizes), keeping its direction.
+        Resolves the name and the direction of every column the candidates are ranked by: what the surrogate declares,
+        mapped by the value transformers of the optimizer. A value that is not the prediction of an objective (a ratio, an
+        upper confidence bound, a weighted sum) keeps its own name.
         :param surrogate: the surrogate that predicts the candidates.
         :return: one criterion per ranked column, named as the column.
         :raises ValueError: if the surrogate predicts columns without a direction that no value transformer gives one.
@@ -58,10 +58,6 @@ class Optimizer(ABC):
         if criteria is None:
             raise ValueError(f"The columns {type(surrogate).__name__} predicts have no direction to rank candidates by: "
                              f"an acquisition function has to turn them into a score.")
-        if self.value_transformers:
-            names = ["Y"] if surrogate.scalarized else self.objectives.names
-            if len(names) == len(criteria):
-                criteria = tuple(Criterion(name, criterion.minimization) for name, criterion in zip(names, criteria))
         return tuple(criteria)
 
     def _rank_candidates(self, candidates: pd.DataFrame, criteria: Sequence[Criterion]) -> pd.DataFrame:

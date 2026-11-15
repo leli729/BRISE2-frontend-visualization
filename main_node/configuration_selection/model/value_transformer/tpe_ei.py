@@ -41,7 +41,7 @@ class TpeEi(AcquisitionFunction):
         super().__init__(value_transformer_description, objectives)
 
     def transform_criteria(self, criteria: Optional[Sequence[Criterion]]) -> Tuple[Criterion, ...]:
-        return (Criterion("ratio", minimization=False),)
+        return (Criterion.derived("ratio", self.objectives, minimization=False),)
 
     def transform(self, objective_function_values: pd.DataFrame) -> pd.DataFrame:
         names = objective_function_values.columns.tolist()
@@ -64,6 +64,6 @@ class TpeEi(AcquisitionFunction):
         # if the good_kde has a finite value, i.e. there is no config with that value in the bad kde, so it shouldn't be terrible.
         ratio = np.where(~np.isfinite(ratio) & np.isfinite(good), good, ratio)
 
-        result = pd.DataFrame({"ratio": ratio})
+        result = pd.DataFrame({self.transform_criteria(None)[0].name: ratio})
 
         return result

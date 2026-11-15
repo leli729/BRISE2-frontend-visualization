@@ -179,6 +179,6 @@ class TestReportedPredictions:
 
         result = setup.optimizer.optimize(setup.surrogate)
 
-        labels = ["Y"] if setup.surrogate.scalarized else setup.optimizer.objectives.names
+        labels = [criterion.name for criterion in setup.optimizer.resolve_criteria(setup.surrogate)]
         predicted = setup.surrogate.predict_batch(result.drop(columns=labels))
         np.testing.assert_allclose(result[labels].values, setup.optimizer._transform_values(predicted).values)

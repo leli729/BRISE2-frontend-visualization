@@ -235,6 +235,7 @@ class Model:
 
         # run optimizer, calling the surrogate
         optimized_full = pd.DataFrame()
+        ranked_columns = []  # what the candidates are ranked by, named as the optimizers resolve it
         if self.mo_handling_surrogate_type != "Compositional":
             for s in created_surrogates:
                 for optimizer, objective in self.mapping_optimizer_objective.items():  # always 1 optimizer in 2.6.0
@@ -243,6 +244,7 @@ class Model:
                             "Optimizer": optimizer.optimizer_description} | {"Objectives_optimizer": objective.to_description()})
                     optimized = optimizer.optimize(s)
                     optimized_full = pd.concat([optimized_full, optimized])
+                    ranked_columns += [c.name for c in optimizer.resolve_criteria(s) if c.name not in ranked_columns]
         else:
             composite_surrogate: CompositeSurrogate = created_surrogates[0]
             for s in composite_surrogate.surrogates:
@@ -253,16 +255,13 @@ class Model:
                                 "Optimizer": optimizer.optimizer_description} | {"Objectives_optimizer": objective.to_description()})
                         optimized = optimizer.optimize(s)
                         optimized_full = pd.concat([optimized_full, optimized])
+                        ranked_columns += [c.name for c in optimizer.resolve_criteria(s)
+                                           if c.name not in ranked_columns]
 
         # select candidates
 
-        contains_scalarized_surrogate = any([s.scalarized for s in created_surrogates])
-        if not contains_scalarized_surrogate:
-            names_and_objectives = [r.name for r in self.region] + self.objectives.names
-        else:
-            names_and_objectives = [r.name for r in self.region] + ["Y"]
-
-        selected_candidates = self.candidate_selector.select_candidates(optimized_full[names_and_objectives])
+        selected_candidates = self.candidate_selector.select_candidates(
+            optimized_full[[r.name for r in self.region] + ranked_columns])
 
         return pd.DataFrame(selected_candidates)
 

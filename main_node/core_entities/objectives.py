@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, Iterator, List, Mapping, Tuple
+from typing import Dict, Iterable, Iterator, List, Mapping, Tuple
 
 
 @dataclass(frozen=True)
@@ -17,6 +17,16 @@ class Criterion:
     def sign(self) -> float:
         """1 for a minimized criterion, -1 for a maximized one: value * sign is to be minimized."""
         return 1.0 if self.minimization else -1.0
+
+    @staticmethod
+    def derived(function: str, inputs: Iterable[Criterion], minimization: bool) -> Criterion:
+        """
+        :param function: what is computed of the inputs, e.g. "ratio"; named as the value transformer or the surrogate.
+        :param inputs: the criteria the value is derived from.
+        :param minimization: the direction the derived value is ranked in.
+        :return: a criterion named in function notation, e.g. "weighted_sum(Y1,Y2)" or "ucb(weighted_sum(Y1,Y2))".
+        """
+        return Criterion(f"{function}({','.join(criterion.name for criterion in inputs)})", minimization)
 
 
 @dataclass(frozen=True)

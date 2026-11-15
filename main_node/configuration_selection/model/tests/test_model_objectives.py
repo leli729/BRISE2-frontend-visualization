@@ -94,6 +94,29 @@ class TestPredictionInfo:
         assert {name for entry in stored for name in entry["Objectives_surrogate"]} == set(predicted.objectives_description)
 
 
+class TestCandidateColumns:
+    """
+    The candidates a model proposes are ranked by the values its optimizers rank them by; each is named by the criterion
+    it is a value of, so that a ratio or an upper confidence bound is not mistaken for a prediction of an objective.
+    """
+
+    @pytest.mark.parametrize("test_case, key, ranked", [
+        (10, "Model", ["Y1"]),  # a regression surrogate predicts the objective
+        (1, "Model", ["weighted_sum(Y1,Y2)"]),  # a regression surrogate with a weighted sum
+        (3, "Model", [f"ratio(Y{i})" for i in range(1, 6)]),  # tree Parzen estimators with an acquisition function
+        (2, "Model_0", ["Y1", "Y2", "Y3", "Y4", "Y5"]),  # one regression surrogate for 5 objectives
+    ], ids=["regression", "weighted_sum", "compositional_acquisition_functions", "pure_objectives"])
+    def test_a_model_proposes_candidates_with_the_values_they_are_ranked_by(
+            self, get_experiment, test_case, key, ranked):
+        description, search_space = get_experiment(test_case)
+        model = _model(description, search_space, key)
+        objectives = description["Context"]["TaskConfiguration"]["Objectives"]
+
+        candidates = model.predict(list(model.region), _measured_configurations(model.region, objectives))
+
+        assert candidates.columns.tolist() == [hp.name for hp in model.region] + ranked
+
+
 class TestTransferredModels:
     """Transfer learning rebuilds the surrogates and optimizers of a source experiment from the stored information."""
 

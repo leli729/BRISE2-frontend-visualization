@@ -19,7 +19,7 @@ class MultiArmedBandit(Surrogate):
 
     def output_criteria(self) -> Optional[Tuple[Criterion, ...]]:
         # an upper confidence bound, "optimism in the face of uncertainty": higher is better, whatever the labels' direction
-        return tuple(Criterion(criterion.name, minimization=False) for criterion in self._label_criteria())
+        return tuple(Criterion.derived("ucb", [label], minimization=False) for label in self._label_criteria())
 
     def create(self, features: pd.DataFrame, labels: pd.DataFrame) -> bool:
         if self.objective.minimization:
@@ -96,12 +96,8 @@ class MultiArmedBandit(Surrogate):
             ucb = self.categories_info[hp_name][cfg[hp_name]]["UCB_value"]
             ucbs.append(ucb)
         summed_ucb = sum(ucbs)
-        if not self.scalarized:
-            result = pd.DataFrame([summed_ucb], columns=self.objectives.names)
-        else:
-            result = pd.DataFrame([summed_ucb], columns=["Y"])
 
-        return result
+        return pd.DataFrame([summed_ucb], columns=[criterion.name for criterion in self.output_criteria()])
 
     def predict_batch(self, configurations: pd.DataFrame, transform: bool = True) -> pd.DataFrame:
         # UCB values come from a category lookup table, not a fittable model, so there is no vectorized

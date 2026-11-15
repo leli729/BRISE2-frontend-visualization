@@ -20,9 +20,11 @@ class TestTpeEi:
     def test_each_row_of_a_batch_gets_its_own_ratio_of_good_to_bad_whatever_the_direction(self, minimization):
         acquisition_function = _acquisition_function(minimization)
 
-        batch = acquisition_function.transform(PROBABILITIES)["ratio"].tolist()
-        rows = [acquisition_function.transform(PROBABILITIES.iloc[[i]].reset_index(drop=True))["ratio"].iloc[0]
-                for i in range(len(PROBABILITIES))]
+        batch = acquisition_function.transform(PROBABILITIES)["ratio(Y1)"].tolist()
+        rows = []
+        for i in range(len(PROBABILITIES)):
+            row = acquisition_function.transform(PROBABILITIES.iloc[[i]].reset_index(drop=True))
+            rows.append(row["ratio(Y1)"].iloc[0])
 
         assert batch == pytest.approx([5.0, 0.5, 0.0])
         assert rows == pytest.approx([5.0, 0.5, 0.0])
@@ -33,6 +35,6 @@ class TestTpeEi:
         # produces this, since it floors both densities at 1e-32, so it checks TpeEi as a unit
         probabilities = pd.DataFrame({"Y1_probability_good": [0.5], "Y1_probability_bad": [0.0]})
 
-        ratio = _acquisition_function(minimization).transform(probabilities)["ratio"].tolist()
+        ratio = _acquisition_function(minimization).transform(probabilities)["ratio(Y1)"].tolist()
 
         assert ratio == pytest.approx([0.5])

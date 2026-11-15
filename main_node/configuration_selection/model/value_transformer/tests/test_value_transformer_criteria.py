@@ -34,7 +34,7 @@ class TestWeightedSum:
 
         transformed = _weighted_sum(objectives, [1, 2]).transform(predictions)
 
-        assert transformed["Y"].tolist() == pytest.approx(expected)
+        assert transformed["weighted_sum(Y1,Y2)"].tolist() == pytest.approx(expected)
 
     @pytest.mark.parametrize("minimizations", [(True, True), (True, False), (False, False)])
     def test_the_weighted_sum_is_declared_minimized_whatever_the_directions_of_the_objectives(self, minimizations):
@@ -42,7 +42,7 @@ class TestWeightedSum:
 
         criteria = _weighted_sum(objectives, [1, 2]).transform_criteria(tuple(objectives))
 
-        assert _directions(criteria) == [("Y", True)]
+        assert _directions(criteria) == [("weighted_sum(Y1,Y2)", True)]
 
 
 class TestTpeEi:
@@ -54,4 +54,4 @@ class TestTpeEi:
 
         criteria = acquisition_function.transform_criteria(None)  # a TPE declares no rankable value of its own
 
-        assert _directions(criteria) == [("ratio", False)]
+        assert _directions(criteria) == [("ratio(Y1)", False)]

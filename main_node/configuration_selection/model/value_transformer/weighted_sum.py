@@ -13,16 +13,12 @@ class WeightedSum(ValueScalarizator):
         self.signed_weights = [weight * objective.sign for weight, objective in zip(self.weights, objectives)]
 
     def transform_criteria(self, criteria: Optional[Sequence[Criterion]]) -> Tuple[Criterion, ...]:
-        return (Criterion("Y", minimization=True),)
+        # the inputs are named when known; a declaration never checks them
+        inputs = self.objectives if criteria is None else criteria
+        return (Criterion.derived("weighted_sum", inputs, minimization=True),)
 
     def transform(self, objective_function_values: pd.DataFrame) -> pd.DataFrame:
         assert len(objective_function_values.columns) == len(self.weights) == len(self.signed_weights)
         transformed_objective_function_values = objective_function_values.dot(self.signed_weights)
-        temp_df = pd.DataFrame()
-        if type(transformed_objective_function_values) is pd.Series:
-            transformed_objective_function_values = pd.concat([temp_df, transformed_objective_function_values])
-            transformed_objective_function_values.rename(columns={0: "Y"}, inplace=True)
-        else:
-            transformed_objective_function_values.rename(columns={"<unnamed>": "Y"}, inplace=True)
-
-        return transformed_objective_function_values
+        weighted_sum = Criterion.derived("weighted_sum", self.objectives, minimization=True)
+        return transformed_objective_function_values.to_frame(weighted_sum.name)

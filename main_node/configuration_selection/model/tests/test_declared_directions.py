@@ -7,6 +7,7 @@ import pytest
 from configuration_selection.model.optimizer.moea import MOEA
 from configuration_selection.model.optimizer.random_search import RandomSearch
 from configuration_selection.model.surrogate.composite_surrogate import CompositeSurrogate
+from configuration_selection.model.surrogate.model_mock import ModelMock
 from configuration_selection.model.surrogate.surrogate_abs import Surrogate
 from configuration_selection.model.surrogate.surrogate_orchestrator import SurrogateOrchestrator
 from configuration_selection.model.surrogate.tree_parzen_estimator import TreeParzenEstimator
@@ -60,6 +61,15 @@ def _objectives(*minimizations) -> Objectives:
     return _named_objectives(**{f"Y{i + 1}": m for i, m in enumerate(minimizations)})
 
 
+def _categorical_observations(region, objectives, rng):
+    """Observations of a categorical region; the index of the first parameter's category is every objective's value."""
+    features = pd.DataFrame({hp.name: [hp.categories[rng.integers(len(hp.categories))] for _ in range(60)]
+                             for hp in region})
+    first = region[0]
+    quality = features[first.name].map({category: index for index, category in enumerate(first.categories)})
+    return features, pd.DataFrame({name: quality.astype(float) for name in objectives.names})
+
+
 def _directions(criteria) -> list:
     return [(criterion.name, criterion.minimization) for criterion in criteria]
 
@@ -94,7 +104,7 @@ class TestDeclaredOutput:
     def test_a_scalarizing_surrogate_declares_the_minimized_weighted_sum(self):
         surrogate = ObjectivePredictor(WEIGHTED_SUM, (X,), _objectives(True, False))
 
-        assert _directions(surrogate.output_criteria()) == [("Y", True)]
+        assert _directions(surrogate.output_criteria()) == [("weighted_sum(Y1,Y2)", True)]
 
     def test_a_composite_surrogate_declares_the_declarations_of_its_surrogates(self):
         first = ObjectivePredictor({}, (X,), _objectives(True))
@@ -112,12 +122,27 @@ class TestDeclaredOutput:
     def test_a_multi_armed_bandit_declares_its_upper_confidence_bound_maximized(self, get_experiment):
         surrogate, _, _, _ = _from_case(get_experiment, 11, "Model_0")  # Y1 maximized
 
-        assert _directions(surrogate.output_criteria()) == [("Y1", False)]
+        assert _directions(surrogate.output_criteria()) == [("ucb(Y1)", False)]
 
-    def test_a_scalarizing_multi_armed_bandit_declares_its_upper_confidence_bound_maximized(self, get_experiment):
+    def test_a_scalarizing_multi_armed_bandit_declares_the_upper_confidence_bound_of_the_weighted_sum(
+            self, get_experiment):
         surrogate, _, _, _ = _from_case(get_experiment, 8, "Model_0")  # Y1 and Y2 maximized, a weighted sum
 
-        assert _directions(surrogate.output_criteria()) == [("Y", False)]
+        assert _directions(surrogate.output_criteria()) == [("ucb(weighted_sum(Y1,Y2))", False)]
+
+    def test_a_model_mock_declares_a_random_value_for_each_objective_in_its_direction(self):
+        objectives = _objectives(True, False)
+
+        surrogate = ModelMock({"Instance": {"ModelMock": {"MultiObjective": False}}}, (X,), objectives)
+
+        assert _directions(surrogate.output_criteria()) == [
+            (f"random({objective.name})", objective.minimization) for objective in objectives]
+
+    def test_a_scalarizing_model_mock_declares_one_random_value_in_the_direction_of_the_weighted_sum(self):
+        surrogate = ModelMock({"Instance": {"ModelMock": {"MultiObjective": False}}} | WEIGHTED_SUM, (X,),
+                              _objectives(True, False))
+
+        assert _directions(surrogate.output_criteria()) == [("random(weighted_sum(Y1,Y2))", True)]
 
     def test_a_tree_parzen_estimator_declares_no_rankable_value(self, get_experiment):
         surrogate, _, _, _ = _from_case(get_experiment, 12, "Model_1")
@@ -140,29 +165,29 @@ class TestResolvedCriteria:
 
         resolved = _random_search({}, objectives).resolve_criteria(ObjectivePredictor(WEIGHTED_SUM, (X,), objectives))
 
-        assert _directions(resolved) == [("Y", True)]
+        assert _directions(resolved) == [("weighted_sum(Y1,Y2)", True)]
 
     def test_a_weighted_sum_of_the_optimizer_is_ranked_minimized(self):
         objectives = _objectives(True, False)
 
         resolved = _random_search(WEIGHTED_SUM, objectives).resolve_criteria(ObjectivePredictor({}, (X,), objectives))
 
-        assert _directions(resolved) == [("Y", True)]
+        assert _directions(resolved) == [("weighted_sum(Y1,Y2)", True)]
 
     @pytest.mark.parametrize("minimization", [True, False])
-    def test_an_acquisition_function_ranks_its_score_maximized_under_the_name_of_the_objective(self, minimization):
+    def test_an_acquisition_function_ranks_its_ratio_maximized_under_its_own_name(self, minimization):
         objectives = _objectives(minimization)
 
         resolved = _random_search(TPE_EI, objectives).resolve_criteria(ProbabilityPredictor({}, (X,), objectives))
 
-        assert _directions(resolved) == [("Y1", False)]
+        assert _directions(resolved) == [("ratio(Y1)", False)]
 
-    def test_an_upper_confidence_bound_is_ranked_maximized(self, get_experiment):
+    def test_an_upper_confidence_bound_is_ranked_maximized_under_its_own_name(self, get_experiment):
         surrogate, _, _, objectives = _from_case(get_experiment, 11, "Model_0")
 
         resolved = _random_search({}, objectives).resolve_criteria(surrogate)
 
-        assert _directions(resolved) == [("Y1", False)]
+        assert _directions(resolved) == [("ucb(Y1)", False)]
 
     def test_densities_without_an_acquisition_function_have_no_direction_to_rank_by(self):
         objectives = _objectives(True)
@@ -221,8 +246,18 @@ class TestRankingByDeclaredDirection:
 
         result = _moea(TPE_EI, objectives).optimize(ProbabilityPredictor({}, (X,), objectives))
 
-        assert result["Y1"].is_monotonic_decreasing
+        assert result["ratio(Y1)"].is_monotonic_decreasing
         assert result.iloc[0]["x"] > 0.95
+
+    @pytest.mark.parametrize("optimizer", [_random_search, _moea], ids=["random_search", "moea"])
+    def test_candidates_are_reported_under_the_name_of_the_weighted_sum_they_are_ranked_by(self, optimizer):
+        objectives = _objectives(True, False)
+
+        of_surrogate = optimizer({}, objectives).optimize(ObjectivePredictor(WEIGHTED_SUM, (X,), objectives))
+        of_optimizer = optimizer(WEIGHTED_SUM, objectives).optimize(ObjectivePredictor({}, (X,), objectives))
+
+        assert set(of_surrogate.columns) == {"x", "weighted_sum(Y1,Y2)"}
+        assert set(of_optimizer.columns) == {"x", "weighted_sum(Y1,Y2)"}
 
 
 class TestSurrogatesUnderAScalarizer:
@@ -249,17 +284,67 @@ class TestSurrogatesUnderAScalarizer:
     def test_a_multi_armed_bandit_prefers_the_categories_of_better_objectives(self, get_experiment):
         # test_case_8: Y1 and Y2 are maximized, scalarized by a weighted sum
         surrogate, _, region, objectives = _from_case(get_experiment, 8, "Model_0")
-        rng = np.random.default_rng(0)
-        features = pd.DataFrame({hp.name: [hp.categories[rng.integers(len(hp.categories))] for _ in range(60)]
-                                 for hp in region})
-        first = region[0]
-        quality = features[first.name].map({category: index for index, category in enumerate(first.categories)})
-        labels = pd.DataFrame({name: quality.astype(float) for name in objectives.names})
+        features, labels = _categorical_observations(region, objectives, rng=np.random.default_rng(0))
         assert surrogate.create(features, labels)
+        first = region[0]
 
         def upper_confidence_bound(category):
             configuration = pd.Series({hp.name: hp.categories[0] for hp in region})
             configuration[first.name] = category
-            return surrogate.predict(configuration)["Y"].iloc[0]
+            return surrogate.predict(configuration)["ucb(weighted_sum(Y1,Y2))"].iloc[0]
 
         assert upper_confidence_bound(first.categories[-1]) > upper_confidence_bound(first.categories[0])
+
+
+class TestPredictedColumnsAreTheDeclaredOnes:
+    """A surrogate names the columns it predicts by the criteria it declares, so that candidates are ranked by them."""
+
+    @staticmethod
+    def _declared_names(surrogate) -> list:
+        return [criterion.name for criterion in surrogate.output_criteria()]
+
+    def test_a_scalarizing_regression_surrogate_predicts_the_weighted_sum(self, get_experiment):
+        # test_case_1: Y1 and Y2 minimized, a support vector regression with a weighted sum
+        surrogate, _, region, objectives = _from_case(get_experiment, 1, "Model")
+        rng = np.random.default_rng(0)
+        features = pd.DataFrame({hp.name: [hp.transform(share) for share in rng.uniform(0, 1, 30)] for hp in region})
+        labels = pd.DataFrame({name: rng.uniform(0, 1, 30) for name in objectives.names})
+        assert surrogate.create(features, labels)
+
+        for predicted in (surrogate.predict_batch(features), surrogate.predict(features.iloc[0])):
+            assert predicted.columns.tolist() == self._declared_names(surrogate)
+
+    @pytest.mark.parametrize("test_case", [11, 8], ids=["plain", "scalarizing"])
+    def test_a_multi_armed_bandit_predicts_its_upper_confidence_bound(self, get_experiment, test_case):
+        surrogate, _, region, objectives = _from_case(get_experiment, test_case, "Model_0")
+        assert surrogate.create(*_categorical_observations(region, objectives, rng=np.random.default_rng(0)))
+        configuration = pd.Series({hp.name: hp.categories[0] for hp in region})
+
+        declared = self._declared_names(surrogate)
+        assert surrogate.predict(configuration).columns.tolist() == declared
+        assert surrogate.predict_batch(pd.DataFrame([configuration])).columns.tolist() == declared
+
+    def test_a_composite_of_multi_armed_bandits_predicts_the_bound_of_each_objective(self, get_experiment):
+        description, search_space = get_experiment(11)  # the bandit's region is the root, a categorical parameter
+        region = search_space.regions[0]
+        model = description["ConfigurationSelection"]["Predictor"]["Model_0"]
+        bandits = []
+        for objectives in (_named_objectives(Y1=False), _named_objectives(Y2=False)):
+            bandit_description = copy.deepcopy(model["Surrogate"])
+            bandit = SurrogateOrchestrator().get_surrogate(bandit_description, region, objectives)
+            assert bandit.create(*_categorical_observations(region, objectives, rng=np.random.default_rng(0)))
+            bandits.append(bandit)
+        composite = CompositeSurrogate(tuple(bandits), region)
+        configuration = pd.Series({hp.name: hp.categories[0] for hp in region})
+
+        assert composite.predict(configuration).columns.tolist() == ["ucb(Y1)", "ucb(Y2)"]
+        assert composite.predict(configuration).columns.tolist() == self._declared_names(composite)
+
+    @pytest.mark.parametrize("description", [{}, WEIGHTED_SUM], ids=["plain", "scalarizing"])
+    def test_a_model_mock_predicts_a_random_value_for_each_ranked_criterion(self, description):
+        objectives = _objectives(True, False)
+        surrogate = ModelMock({"Instance": {"ModelMock": {"MultiObjective": False}}} | description, (X,), objectives)
+        features = pd.DataFrame({"x": [0.2, 0.8]})
+
+        for predicted in (surrogate.predict_batch(features), surrogate.predict(features.iloc[0])):
+            assert predicted.columns.tolist() == self._declared_names(surrogate)
