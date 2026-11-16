@@ -183,10 +183,13 @@ ConfigurationSelection {
           Compositional {
             [fcard.parent.parent.parent.Surrogate = size childs.Context.TaskConfiguration.Objectives]
             [fcard.parent.parent.parent.Optimizer = size childs.Context.TaskConfiguration.Objectives]
+            [self excludes parent.parent.parent.Surrogate.ValueTransformers.ValueScalarizator]
+            [self excludes parent.parent.parent.Optimizer.ValueTransformers.ValueScalarizator]
             [fcard.parent.parent.parent.Validator.InternalValidator = 0]
           }
           DynamicCompositional {
             [self excludes parent.parent.parent.Surrogate.Instance.TreeParzenEstimator]
+            [self excludes parent.parent.parent.Surrogate.ValueTransformers.ValueScalarizator]
             [fcard.parent.parent.parent.Optimizer = 1]
             [fcard.parent.parent.parent.Validator.InternalValidator = 1]
           }
@@ -479,9 +482,21 @@ ConfigurationSelection {
           }
           xor AcquisitionFunction {
             TPE_EI {
+              // TPE_EI needs a TPE surrogate in the same Model. Written as one excludes per other surrogate, because Waffle
+              // does not enforce a requires on a child of an xor group (bug 1); replace by one requires once it does.
+              [self excludes parent.parent.parent.parent.Surrogate.Instance.LinearRegression]
+              [self excludes parent.parent.parent.parent.Surrogate.Instance.SupportVectorRegression]
+              [self excludes parent.parent.parent.parent.Surrogate.Instance.GradientBoostingRegressor]
+              [self excludes parent.parent.parent.parent.Surrogate.Instance.BayesianRidgeRegression]
+              [self excludes parent.parent.parent.parent.Surrogate.Instance.MultiArmedBandit]
+              [self excludes parent.parent.parent.parent.Surrogate.Instance.GaussianProcessRegressor]
+              [self excludes parent.parent.parent.parent.Surrogate.Instance.MultiLayerPerceptronRegressor]
+              [self excludes parent.parent.parent.parent.Surrogate.Instance.ModelMock]
               Type -> predefined
               [Type = "tpe_ei"]
             }
+            // an acquisition function and a scalarizer on one optimizer are forbidden for now (value transformer chains)
+            [self excludes parent.ValueScalarizator]
           }
         }
         xor Instance {
