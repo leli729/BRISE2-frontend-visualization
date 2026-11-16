@@ -38,3 +38,11 @@ export function isAxisParameter(spec: ParameterSpec | undefined): boolean {
 
     return false
 }
+
+// a parameter can span a heatmap axis if it is nominal or ordinal with at least two categories
+export function isCategoricalAxisParameter(spec: ParameterSpec | undefined): boolean {
+    return (
+        isAxisParameter(spec) &&
+        (spec?.Type === "NominalHyperparameter" || spec?.Type === "OrdinalHyperparameter")
+    )
+}

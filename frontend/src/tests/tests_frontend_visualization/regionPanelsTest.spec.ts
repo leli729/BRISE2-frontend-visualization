@@ -12,7 +12,7 @@ import { Contour, ContourRegionPanel } from '../../widgets/charts/contour'
 import { Heatmap, HeatmapRegionPanel } from '../../widgets/charts/heatmap'
 import { ParaCoord, ParaCoordRegionPanel } from '../../widgets/charts/para-coord'
 import { HypImp, HypImpRegionPanel } from '../../widgets/charts/hyp-imp'
-import { ALPHA, BETA, FLAG, GAMMA, N0, N1, O1, flatCategoricalRegion, n0, n1, o1, regionA, regionB } from './searchSpaceFixture'
+import { ALPHA, BETA, FLAG, GAMMA, N0, N1, O1, alpha, beta, flag, flatCategoricalRegion, n0, n1, o1, regionA, regionB } from './searchSpaceFixture'
 import type { SearchSpaceRegion } from '../../entities/experiment/model/experiment.model'
 
 const vuetify = createVuetify({ components, directives })
@@ -243,7 +243,34 @@ describe('Region panels', () => {
         })
 
         expect(wrapper.findComponent(Heatmap).exists()).toBe(false)
-        expect(wrapper.text()).toContain('Not enough parameters in this region for a heatmap.')
+        expect(wrapper.text()).toContain('Not enough categorical parameters in this region for a heatmap.')
+    })
+
+    it('heatmap panel offers only the nominal and ordinal parameters with two categories or more', () => {
+        // the numeric parameters and the single-category one come first and between, so the defaults skip them
+        const wrapper = mountPanel(HeatmapRegionPanel, {
+            region: { ActivationCategory: 'root', Parameters: [alpha, n0, beta, flag, n1, o1] },
+            showTitle: false,
+            heatmapObjective: 'runtime'
+        })
+
+        const [axis1, axis2] = wrapper.findAllComponents(VSelect)
+        expect(axis1.props('items')).toEqual([N0, O1])
+        expect(axis2.props('items')).toEqual([N1, O1])
+        const heatmap = wrapper.findComponent(Heatmap)
+        expect(heatmap.props('heatmapParam1')).toBe(N0)
+        expect(heatmap.props('heatmapParam2')).toBe(N1)
+    })
+
+    it('heatmap panel explains instead of drawing a region with fewer than two categorical parameters', () => {
+        const wrapper = mountPanel(HeatmapRegionPanel, {
+            region: { ActivationCategory: 'root', Parameters: [alpha, n0, beta, flag] },
+            showTitle: false,
+            heatmapObjective: 'runtime'
+        })
+
+        expect(wrapper.findComponent(Heatmap).exists()).toBe(false)
+        expect(wrapper.text()).toContain('Not enough categorical parameters in this region for a heatmap.')
     })
 
     it('heatmap panel shows the region title only when asked to', async () => {

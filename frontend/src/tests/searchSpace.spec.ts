@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { axisValues, isAxisParameter } from '../entities/experiment/lib/search-space'
+import { axisValues, isAxisParameter, isCategoricalAxisParameter } from '../entities/experiment/lib/search-space'
 import type { ParameterSpec } from '../entities/experiment/model/experiment.model'
 
 const numeric = (Type: string): ParameterSpec => ({
@@ -42,6 +42,29 @@ describe('isAxisParameter', () => {
     it('rejects an unknown parameter and an unknown type', () => {
         expect(isAxisParameter(undefined)).toBe(false)
         expect(isAxisParameter(numeric('Category'))).toBe(false)
+    })
+})
+
+describe('isCategoricalAxisParameter', () => {
+    it.each(['NominalHyperparameter', 'OrdinalHyperparameter'])('accepts a %s with two categories', (type) => {
+        expect(isCategoricalAxisParameter(categorical(type, [LOW, HIGH]))).toBe(true)
+    })
+
+    it.each(['FloatHyperparameter', 'IntegerHyperparameter'])('rejects a %s', (type) => {
+        expect(isCategoricalAxisParameter(numeric(type))).toBe(false)
+    })
+
+    it.each(['NominalHyperparameter', 'OrdinalHyperparameter'])('rejects a %s with a single category', (type) => {
+        expect(isCategoricalAxisParameter(categorical(type, [LOW]))).toBe(false)
+    })
+
+    it.each(['NominalHyperparameter', 'OrdinalHyperparameter'])('rejects a %s without categories', (type) => {
+        expect(isCategoricalAxisParameter(categorical(type))).toBe(false)
+    })
+
+    it('rejects an unknown parameter and an unknown type', () => {
+        expect(isCategoricalAxisParameter(undefined)).toBe(false)
+        expect(isCategoricalAxisParameter(categorical('Category', [LOW, HIGH]))).toBe(false)
     })
 })
 

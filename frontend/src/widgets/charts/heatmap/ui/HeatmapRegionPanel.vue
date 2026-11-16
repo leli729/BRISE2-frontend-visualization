@@ -2,7 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import Heatmap from './Heatmap.vue'
 import RegionTitle from '../../../../entities/experiment/ui/RegionTitle.vue'
-import { isAxisParameter } from '../../../../entities/experiment/lib/search-space'
+import { isCategoricalAxisParameter } from '../../../../entities/experiment/lib/search-space'
 import type { SearchSpaceRegion } from '../../../../entities/experiment/model/experiment.model'
 
 defineOptions({ name: 'HeatmapRegionPanel' })
@@ -13,9 +13,9 @@ const props = defineProps<{
     heatmapObjective: string
 }>()
 
-// parameters of the region that can span a heatmap axis
+// parameters of the region that can span a heatmap axis: the categorical ones
 const heatmapParameterNames = computed(() =>
-    props.region.Parameters.filter(isAxisParameter).map(parameter => parameter.Name)
+    props.region.Parameters.filter(isCategoricalAxisParameter).map(parameter => parameter.Name)
 )
 
 const heatmapParam1 = ref("")
@@ -46,7 +46,7 @@ watch(
       v-if="heatmapParameterNames.length < 2"
       class="text-body-2 text-medium-emphasis region-message"
     >
-      Not enough parameters in this region for a heatmap.
+      Not enough categorical parameters in this region for a heatmap.
     </div>
     <template v-else>
       <v-select
