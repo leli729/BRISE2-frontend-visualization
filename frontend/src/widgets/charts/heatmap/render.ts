@@ -40,17 +40,29 @@ export function renderHeatmap(
     const y = axisOf(param1, trials, specsByName)
     const x = axisOf(param2, trials, specsByName)
 
-    const results = new Map<string, number>()
+    // a cell fixes the values of two parameters only, so configurations that differ in the others share it
+    const resultsOfCell = new Map<string, number[]>()
     for (const trial of trials) {
-        results.set(`${labelOf(trial, param1)},${labelOf(trial, param2)}`, trial.results[objective])
+        const key = `${labelOf(trial, param1)},${labelOf(trial, param2)}`
+        resultsOfCell.set(key, [...(resultsOfCell.get(key) ?? []), trial.results[objective]])
     }
+    const means = new Map<string, number>()
+    resultsOfCell.forEach((results, key) => means.set(key, results.reduce((sum, result) => sum + result, 0) / results.length))
+    const counts = y.map(yLabel => x.map(xLabel => resultsOfCell.get(`${yLabel},${xLabel}`)?.length ?? 0))
 
     const data: Data[] = [
-        { // the cells: the result of the configuration at the two values
+        { // the cells: the mean result of the configurations at the two values, with their number in the hover
             type: theme.value.type as 'heatmap',
-            z: DataTransformer.buildZMatrix(x, y, results),
+            z: DataTransformer.buildZMatrix(x, y, means),
             x,
             y,
+            customdata: counts,
+            hoverongaps: false,
+            hovertemplate:
+                `${cleanIdentifier(param1)}: %{y}<br>` +
+                `${cleanIdentifier(param2)}: %{x}<br>` +
+                `${objective}: %{z}<br>` +
+                'configurations: %{customdata}<extra></extra>',
             colorscale: theme.value.color,
             zsmooth: theme.value.smooth as 'fast' | 'best' | false
         },

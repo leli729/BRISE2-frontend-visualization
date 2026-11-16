@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHeatmap } from '../../widgets/charts/heatmap/render'
 import { theme } from '../../widgets/charts/model/heatmap-theme'
 import type { PointExp } from '../../entities/main/model/plot.store'
-import { N0, N1, categoricalSpecsByName } from './searchSpaceFixture'
+import { N0, N1, O1, categoricalSpecsByName } from './searchSpaceFixture'
 
 const plotly = { react: vi.fn(), purge: vi.fn() }
 
@@ -14,6 +14,9 @@ const trial = (configurations: Record<string, string>, results: Record<string, n
 const n01n11 = trial({ [N0]: `${N0}.N01`, [N1]: `${N1}.N11` }, { runtime: 5, energy: 50 })
 const n01n12 = trial({ [N0]: `${N0}.N01`, [N1]: `${N1}.N12` }, { runtime: 7, energy: 70 })
 const n02 = trial({ [N0]: `${N0}.N02` }, { runtime: 9, energy: 90 })
+// two configurations of N02 that differ only in O1, a parameter the heatmap over N0 x N1 does not show: they share a cell
+const n02o11 = trial({ [N0]: `${N0}.N02`, [O1]: `${O1}.O11` }, { runtime: 9, energy: 90 })
+const n02o12 = trial({ [N0]: `${N0}.N02`, [O1]: `${O1}.O12` }, { runtime: 11, energy: 110 })
 
 interface Traces {
     surface: any
@@ -93,6 +96,34 @@ describe('renderHeatmap', () => {
         expect(surface.y).toEqual(['inactive', 'N11', 'N12'])
         expect(surface.x).toEqual(['N01', 'N02'])
         expect(surface.z).toEqual([[null, 9], [5, null], [null, null]])
+    })
+
+    it('shows the mean of the results of the configurations that share a cell', () => {
+        const { surface } = draw([n01n11, n02o11, n02o12])
+
+        expect(surface.z).toEqual([[null, 5, null], [10, null, null]])
+    })
+
+    it('takes the mean of the selected objective', () => {
+        const { surface } = draw([n02o11, n02o12], N0, N1, 'energy')
+
+        expect(surface.z).toEqual([[null, null, null], [100, null, null]])
+    })
+
+    it('tells in the hover of a cell how many configurations it holds', () => {
+        const { surface } = draw([n01n11, n02o11, n02o12])
+
+        expect(surface.customdata).toEqual([[0, 1, 0], [2, 0, 0]])
+        expect(surface.hovertemplate).toContain('%{z}')
+        expect(surface.hovertemplate).toContain('%{customdata}')
+    })
+
+    it('marks the solution without counting it again in its cell', () => {
+        const { surface, star } = draw([n01n11, n01n12], N0, N1, 'runtime', n01n12)
+
+        expect(star.x).toEqual(['N12'])
+        expect(surface.z).toEqual([[5, 7], [null, null]])
+        expect(surface.customdata).toEqual([[1, 1], [0, 0]])
     })
 
     it('marks the measured configurations by crosses in their cells, the inactive ones included', () => {
