@@ -8,7 +8,7 @@ import { LaunchControl } from './widgets/control-bar'
 import { InfoBoard } from './widgets/info-board'
 import { TaskList } from './widgets/task-list'
 import { AppFooter } from './widgets/footer'
-import { Heatmap } from './widgets/charts/heatmap'
+import { HeatmapRegionPanel } from './widgets/charts/heatmap'
 // HeatmapReg is disabled: main-node never publishes a "predictions" message (see front_API.py's
 // SUPPORTED_MESSAGES / APIMessageBuilder - "PREDICTIONS" is registered but nothing ever sends it),
 // so the surrogate surface can never populate. Re-enable once main-node publishes predictions.
@@ -90,9 +90,10 @@ const selectedParetoObjective2 = computed(() => {
 })
 const onlyShowParetoFront = ref(false)
 
-const contourObjective = ref("")
-const selectedContourObjective = computed(() => {
-    return contourObjective.value || objectiveNames.value[0] || ""
+// the contour and the heatmap show the same objective: each chart's block has its own selector bound to this value
+const surfaceObjective = ref("")
+const selectedSurfaceObjective = computed(() => {
+    return surfaceObjective.value || objectiveNames.value[0] || ""
 })
 
 onMounted(() => {
@@ -116,7 +117,7 @@ watch(
         paretoObjective1.value = objectives[0] ?? ""
         paretoObjective2.value = objectives[1] ?? ""
         onlyShowParetoFront.value = false
-        contourObjective.value = objectives[0] ?? ""
+        surfaceObjective.value = objectives[0] ?? ""
     },
     { immediate: true }
 )
@@ -353,7 +354,22 @@ watch(
                 class="pr-2"
               >
                 <div class="chart-block chart-block--heatmap">
-                  <Heatmap />
+                  <v-select
+                    v-model="surfaceObjective"
+                    :items="objectiveNames"
+                    label="Objective"
+                    density="compact"
+                    variant="outlined"
+                    hide-details
+                    class="user-input"
+                  />
+                  <HeatmapRegionPanel
+                    v-for="(region, index) in regions"
+                    :key="index"
+                    :region="region"
+                    :show-title="regions.length > 1"
+                    :heatmap-objective="selectedSurfaceObjective"
+                  />
                 </div>
               </v-col>
 
@@ -474,7 +490,7 @@ watch(
               >
                 <div class="chart-block chart-block--contour">
                   <v-select
-                    v-model="contourObjective"
+                    v-model="surfaceObjective"
                     :items="objectiveNames"
                     label="Objective"
                     density="compact"
@@ -487,7 +503,7 @@ watch(
                     :key="index"
                     :region="region"
                     :show-title="regions.length > 1"
-                    :contour-objective="selectedContourObjective"
+                    :contour-objective="selectedSurfaceObjective"
                   />
                 </div>
               </v-col>

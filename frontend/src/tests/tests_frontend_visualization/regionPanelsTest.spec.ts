@@ -9,9 +9,10 @@ import RegionTitle from '../../entities/experiment/ui/RegionTitle.vue'
 import { Rank, RankRegionPanel } from '../../widgets/charts/rank'
 import { Slice, SliceRegionPanel } from '../../widgets/charts/slice'
 import { Contour, ContourRegionPanel } from '../../widgets/charts/contour'
+import { Heatmap, HeatmapRegionPanel } from '../../widgets/charts/heatmap'
 import { ParaCoord, ParaCoordRegionPanel } from '../../widgets/charts/para-coord'
 import { HypImp, HypImpRegionPanel } from '../../widgets/charts/hyp-imp'
-import { ALPHA, BETA, FLAG, GAMMA, regionA, regionB } from './searchSpaceFixture'
+import { ALPHA, BETA, FLAG, GAMMA, N0, N1, O1, flatCategoricalRegion, n0, n1, o1, regionA, regionB } from './searchSpaceFixture'
 import type { SearchSpaceRegion } from '../../entities/experiment/model/experiment.model'
 
 const vuetify = createVuetify({ components, directives })
@@ -167,5 +168,95 @@ describe('Region panels', () => {
 
         expect(wrapper.findAllComponents(VCheckbox)[0].props('disabled')).toBe(true)
         expect(wrapper.findAllComponents(VCheckbox)[1].props('disabled')).toBe(false)
+    })
+
+    it('heatmap panel selects the first two parameters of its region', () => {
+        const wrapper = mountPanel(HeatmapRegionPanel, {
+            region: flatCategoricalRegion,
+            showTitle: false,
+            heatmapObjective: 'runtime'
+        })
+
+        const heatmap = wrapper.findComponent(Heatmap)
+        expect(heatmap.props('heatmapParam1')).toBe(N0)
+        expect(heatmap.props('heatmapParam2')).toBe(N1)
+    })
+
+    it('heatmap panel selects the first two parameters of a new region', async () => {
+        const wrapper = mountPanel(HeatmapRegionPanel, {
+            region: flatCategoricalRegion,
+            showTitle: false,
+            heatmapObjective: 'runtime'
+        })
+
+        await wrapper.setProps({ region: { ActivationCategory: 'root', Parameters: [o1, n1] } })
+
+        const heatmap = wrapper.findComponent(Heatmap)
+        expect(heatmap.props('heatmapParam1')).toBe(O1)
+        expect(heatmap.props('heatmapParam2')).toBe(N1)
+    })
+
+    it('heatmap panel never offers the parameter chosen for one axis on the other axis', () => {
+        const wrapper = mountPanel(HeatmapRegionPanel, {
+            region: flatCategoricalRegion,
+            showTitle: false,
+            heatmapObjective: 'runtime'
+        })
+
+        const [axis1, axis2] = wrapper.findAllComponents(VSelect)
+        expect(axis1.props('items')).toEqual([N0, O1])
+        expect(axis2.props('items')).toEqual([N1, O1])
+    })
+
+    it('heatmap panel draws the parameter selected for an axis and offers the other axis the rest', async () => {
+        const wrapper = mountPanel(HeatmapRegionPanel, {
+            region: flatCategoricalRegion,
+            showTitle: false,
+            heatmapObjective: 'runtime'
+        })
+
+        await wrapper.findAllComponents(VSelect)[0].vm.$emit('update:modelValue', O1)
+
+        const heatmap = wrapper.findComponent(Heatmap)
+        expect(heatmap.props('heatmapParam1')).toBe(O1)
+        expect(heatmap.props('heatmapParam2')).toBe(N1)
+        expect(wrapper.findAllComponents(VSelect)[1].props('items')).toEqual([N0, N1])
+    })
+
+    it('heatmap panel gives its region and the objective to the heatmap', () => {
+        const wrapper = mountPanel(HeatmapRegionPanel, {
+            region: flatCategoricalRegion,
+            showTitle: false,
+            heatmapObjective: 'runtime'
+        })
+
+        const heatmap = wrapper.findComponent(Heatmap)
+        expect(heatmap.props('region')).toEqual(flatCategoricalRegion)
+        expect(heatmap.props('heatmapObjective')).toBe('runtime')
+    })
+
+    it('heatmap panel explains instead of drawing a region with fewer than two parameters', () => {
+        const wrapper = mountPanel(HeatmapRegionPanel, {
+            region: { ActivationCategory: 'root', Parameters: [n0] },
+            showTitle: false,
+            heatmapObjective: 'runtime'
+        })
+
+        expect(wrapper.findComponent(Heatmap).exists()).toBe(false)
+        expect(wrapper.text()).toContain('Not enough parameters in this region for a heatmap.')
+    })
+
+    it('heatmap panel shows the region title only when asked to', async () => {
+        const wrapper = mountPanel(HeatmapRegionPanel, {
+            region: flatCategoricalRegion,
+            showTitle: true,
+            heatmapObjective: 'runtime'
+        })
+
+        expect(wrapper.findComponent(RegionTitle).props('region')).toEqual(flatCategoricalRegion)
+
+        await wrapper.setProps({ showTitle: false })
+
+        expect(wrapper.findComponent(RegionTitle).exists()).toBe(false)
     })
 })

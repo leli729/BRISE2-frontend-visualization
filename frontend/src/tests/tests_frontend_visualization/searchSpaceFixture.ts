@@ -46,3 +46,23 @@ export const regionOf = (...names: string[]): SearchSpaceRegion => ({
     ActivationCategory: 'root',
     Parameters: names.map(Name => ({ Name, Type: 'IntegerHyperparameter', Level: 0, Lower: 1, Upper: 64, Inactive: -62 }))
 })
+
+// a categorical space for the heatmap: the nominal N0 activates the nominal N1 (under N01) or the ordinal O1 (under
+// N02); in a flat space the three are one region
+export const N0 = 'Context.SearchSpace.N0'
+export const N1 = `${N0}.N01.N1`
+export const O1 = `${N0}.N02.O1`
+
+export const n0: ParameterSpec = {
+    Name: N0, Type: 'NominalHyperparameter', Level: 0, Categories: [`${N0}.N01`, `${N0}.N02`], Inactive: 'inactive'
+}
+export const n1: ParameterSpec = {
+    Name: N1, Type: 'NominalHyperparameter', Level: 0, Categories: [`${N1}.N11`, `${N1}.N12`], Inactive: 'inactive'
+}
+export const o1: ParameterSpec = {
+    Name: O1, Type: 'OrdinalHyperparameter', Level: 0, Categories: [`${O1}.O11`, `${O1}.O12`], Inactive: 'inactive'
+}
+
+export const flatCategoricalRegion: SearchSpaceRegion = { ActivationCategory: 'root', Parameters: [n0, n1, o1] }
+
+export const categoricalSpecsByName: Record<string, ParameterSpec> = { [N0]: n0, [N1]: n1, [O1]: o1 }
