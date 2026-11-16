@@ -35,9 +35,6 @@
                 "fourteen_hundred_hertz": {
                     "Type": "Category"
                 },
-                "fifteen_hundred_hertz": {
-                    "Type": "Category"
-                },
                 "sixteen_hundred_hertz": {
                     "Type": "Category"
                 },
@@ -53,9 +50,6 @@
                 "twenty_hundred_hertz": {
                     "Type": "Category"
                 },
-                "twenty_one_hundred_hertz": {
-                    "Type": "Category"
-                },
                 "twenty_two_hundred_hertz": {
                     "Type": "Category"
                 },
@@ -66,9 +60,6 @@
                     "Type": "Category"
                 },
                 "twenty_five_hundred_hertz": {
-                    "Type": "Category"
-                },
-                "twenty_six_hundred_hertz": {
                     "Type": "Category"
                 },
                 "twenty_seven_hundred_hertz": {
@@ -151,6 +142,11 @@
         "Predictor": {
             "WindowSize": 1.0,
             "Model": {
+                "MultiObjectiveHandling": {
+                    "SurrogateType": {
+                        "Pure": {}
+                    }
+                },
                 "Surrogate": {
                     "ConfigurationTransformers": {
                         "OrdinalTransformer": {
@@ -252,9 +248,9 @@
             "HyperparameterImportances": {},
             "SlicePlot": {},
             "ContourPlot": {},
+            "ParetoFront": {},
             "EDFPlot": {},
-            "Heatmap": {},
-            "ParetoFront": {}
+            "Heatmap": {}
         }
     }
 }
