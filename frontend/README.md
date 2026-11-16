@@ -90,6 +90,10 @@ displayed. Most charts are computed client-side from measured trials, but Hyperp
 Pareto Front are instead computed by `main-node` over the `main_plot_queue` RPC, so they need `main-node` running to
 render.
 
+Rank, Contour, Slice, Parallel Coordinates, Hyperparameter Importances and Heatmap draw one plot per search-space region.
+The heatmap is offered only for a search space whose parameters are all nominal or ordinal; the constraint is in the
+feature model.
+
 ## Waffle / Searchspace Editor Integration
 
 The app bar (`src/App.vue`) links out to the two tools used to configure an experiment before it's run:
