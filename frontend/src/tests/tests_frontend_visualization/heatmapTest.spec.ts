@@ -4,6 +4,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { ref } from 'vue'
 import { Heatmap } from '../../widgets/charts/heatmap'
 import { theme } from '../../widgets/charts/model/heatmap-theme'
+import { Color } from '../../widgets/charts/model/chart.types'
 import type { ParameterSpec, SearchSpaceRegion } from '../../entities/experiment/model/experiment.model'
 import { N0, N1, O1, n1, categoricalSpecsByName } from './searchSpaceFixture'
 
@@ -64,6 +65,7 @@ describe('Heatmap', () => {
         allRes.value = []
         solution.value = null
         plotlyInstance.value = { react: vi.fn(), purge: vi.fn() }
+        theme.value.color = Color[0] // the colour scale is shared by every chart, so a test must not leave its choice
     })
 
     const mountComponent = (region: SearchSpaceRegion = regionN01) => mount(Heatmap, {
@@ -105,6 +107,18 @@ describe('Heatmap', () => {
         await flushPromises()
 
         expect(lastRender()[7]).toBeNull()
+    })
+
+    it('draws the solution once it arrives', async () => {
+        // at the end of a run the solution is usually a measured point already: only the solution changes
+        allRes.value = [measuredN01]
+        mountComponent()
+        await flushPromises()
+
+        solution.value = measuredN01
+        await flushPromises()
+
+        expect(lastRender()[7]).toEqual(measuredN01)
     })
 
     it('rerenders when allRes changes', async () => {

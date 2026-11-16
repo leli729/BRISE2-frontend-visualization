@@ -61,6 +61,9 @@ describe('renderHeatmap', () => {
         expect(layout.xaxis.title.text).toBe('N1')
         expect(layout.yaxis.categoryarray).toEqual(surface.y)
         expect(layout.xaxis.categoryarray).toEqual(surface.x)
+        // Plotly follows the array only in this order
+        expect(layout.yaxis.categoryorder).toBe('array')
+        expect(layout.xaxis.categoryorder).toBe('array')
     })
 
     it('puts the result of a configuration into the cell of its two values and leaves the other cells empty', () => {
@@ -73,6 +76,7 @@ describe('renderHeatmap', () => {
         const { surface } = draw([n01n11, n01n12], N0, N1, 'energy')
 
         expect(surface.z).toEqual([[50, 70], [null, null]])
+        expect(surface.hovertemplate).toContain('energy (mean): %{z}')
     })
 
     it('adds no inactive category when every configuration has both parameters', () => {
@@ -119,7 +123,8 @@ describe('renderHeatmap', () => {
         expect(hoverLines(surface.customdata[0][1])[0]).toBe('1 configuration')
         expect(hoverLines(surface.customdata[1][0])[0]).toBe('2 configurations')
         expect(surface.customdata[0][0]).toBe('')
-        expect(surface.hovertemplate).toContain('%{z}')
+        expect(surface.hoverongaps).toBe(false) // an empty cell has no hover at all
+        expect(surface.hovertemplate).toContain('runtime (mean): %{z}')
         expect(surface.hovertemplate).toContain('%{customdata}')
     })
 
