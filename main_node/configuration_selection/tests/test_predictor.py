@@ -6,9 +6,11 @@ import pytest
 from configuration_selection.model.model import Model
 from configuration_selection.model.predictor import Predictor
 from core_entities.configuration import Configuration
+from core_entities.objectives import Criterion
 from tools.restore_db import RestoreDB
 
 rdb = RestoreDB()
+Y1_MINIMIZED = Criterion("Y1", minimization=True)
 
 
 def _make_config(parameters):
@@ -172,13 +174,15 @@ class TestPredictedConfigurationsHoldOnlyActiveParameters:
              f"{self.N0}.N02.I1": 22, f"{self.N0}.N02.O1": o1, "Y1": 0.6},
         ])
         predictor.mapping_region_model[region].predict = lambda parameters, configurations: proposals
+        predictor.mapping_region_model[region].ranked_criteria = [Y1_MINIMIZED]
 
         configurations = predictor.predict([_make_config({})])
 
         assert [set(c.parameters) for c in configurations] == [
             self.BRANCH_PARAMETERS[f"{self.N0}.N01"], self.BRANCH_PARAMETERS[f"{self.N0}.N02"]]
         assert [c.parameters[f"{self.N0}.N01.F1"] for c in configurations[:1]] == [1.0]
-        assert [c.predicted_result for c in configurations] == [[0.5], [0.6]]
+        assert [c.predicted_result for c in configurations] == [
+            {"Y1": {"Minimization": True, "Value": 0.5}}, {"Y1": {"Minimization": True, "Value": 0.6}}]
 
 
 class TestPredictionInfoNamesTheModelsThatPredictedTheConfiguration:
@@ -208,6 +212,7 @@ class TestPredictionInfoNamesTheModelsThatPredictedTheConfiguration:
             descriptions = list(cls.EARLIER_CALL["Model"])
             model.created_surrogates_descriptions_and_objectives_and_optimizer_descriptions = descriptions
             model.time_to_build = cls.EARLIER_CALL["time_to_build"]
+            model.ranked_criteria = [Y1_MINIMIZED]
         return predictor
 
     @classmethod
@@ -216,6 +221,7 @@ class TestPredictionInfoNamesTheModelsThatPredictedTheConfiguration:
         def predict(model, parameters, configurations):
             model.created_surrogates_descriptions_and_objectives_and_optimizer_descriptions = list(cls.BUILT["Model"])
             model.time_to_build = cls.BUILT["time_to_build"]
+            model.ranked_criteria = [Y1_MINIMIZED]
             return proposal
         return predict
 
@@ -302,7 +308,7 @@ class TestPredictionInfoNamesTheModelsThatPredictedTheConfiguration:
         assert configurations[0].prediction_info == {"0": self.BUILT, "1": self.BUILT}
         assert [len(dump) for dump in predictor.hierarchical_models_dumps] == [2]
 
-    def test_a_model_that_builds_nothing_holds_no_description_or_build_time(self, get_experiment):
+    def test_a_model_that_builds_nothing_holds_nothing_of_an_earlier_call(self, get_experiment):
         predictor = self._predictor_with_models_built_earlier(get_experiment, 13)
         region, model = next(iter(predictor.mapping_region_model.items()))
 
@@ -311,3 +317,94 @@ class TestPredictionInfoNamesTheModelsThatPredictedTheConfiguration:
         assert candidates.empty
         assert model.created_surrogates_descriptions_and_objectives_and_optimizer_descriptions == []
         assert model.time_to_build is None
+        assert model.ranked_criteria == []
+
+
+class TestPredictedResultNamesEachValueWithItsDirection:
+    """
+    A configuration's predicted result holds, for every value its model ranked the candidates by, the name of the
+    criterion, the direction it is ranked in and the value; a region that did not predict adds nothing.
+    'test_case_13' is flat (one region), 'test_case_11' hierarchical: region 0 is the root (N0), region 1 the branch N01
+    (F1, N1).
+    """
+
+    N0 = "Context.SearchSpace.N0"
+
+    @pytest.fixture(autouse=True)
+    def _database(self):
+        rdb.cleanup()
+        rdb.restore()
+
+    @staticmethod
+    def _predictor(get_experiment, test_case):
+        description, search_space = get_experiment(test_case)
+        return Predictor("experiment_id", description, search_space)
+
+    def _flat_proposal(self, **ranked_values):
+        n0 = self.N0
+        return pd.DataFrame([{n0: f"{n0}.N01", f"{n0}.N01.F1": 1.0, f"{n0}.N01.N1": f"{n0}.N01.N1.N11",
+                              f"{n0}.N02.I1": 11, f"{n0}.N02.O1": f"{n0}.N02.O1.O11"} | ranked_values])
+
+    @staticmethod
+    def _predicting(proposal, criteria):
+        """A model's predict that proposes and records the criteria it ranked by, as the real one does."""
+        def predict(model, parameters, configurations):
+            model.ranked_criteria = criteria
+            return proposal
+        return predict
+
+    @pytest.mark.parametrize("criteria, values, expected", [
+        # Y2 is not an objective of test case 13: the directions come from the model, not from the experiment
+        ([Y1_MINIMIZED, Criterion("Y2", False)], {"Y1": 0.5, "Y2": 0.7},
+         {"Y1": {"Minimization": True, "Value": 0.5}, "Y2": {"Minimization": False, "Value": 0.7}}),
+        ([Criterion("ratio(Y1)", False)], {"ratio(Y1)": 1.7}, {"ratio(Y1)": {"Minimization": False, "Value": 1.7}}),
+    ], ids=["two_criteria_in_their_own_directions", "derived_value"])
+    def test_each_ranked_value_is_stored_under_its_name_with_its_direction(
+            self, get_experiment, monkeypatch, criteria, values, expected):
+        predictor = self._predictor(get_experiment, 13)
+        monkeypatch.setattr(Model, "predict", self._predicting(self._flat_proposal(**values), criteria))
+
+        configurations = predictor.predict([_make_config({})])
+
+        assert [c.predicted_result for c in configurations] == [expected]
+
+    @pytest.mark.parametrize("test_case", [13, 11])
+    def test_a_sampled_configuration_holds_no_predicted_result(self, get_experiment, test_case):
+        predictor = self._predictor(get_experiment, test_case)
+
+        configurations = predictor.predict([], True)
+
+        assert [c.predicted_result for c in configurations] == [{}]
+
+    def test_each_call_holds_the_predicted_result_of_its_own_proposal_only(self, get_experiment, monkeypatch):
+        predictor = self._predictor(get_experiment, 13)
+        stored = {"Y1": {"Minimization": True, "Value": 0.5}}
+        predicting = self._predicting(self._flat_proposal(Y1=0.5), [Y1_MINIMIZED])
+        proposing_nothing = lambda model, parameters, configurations: pd.DataFrame()  # keeps the criteria of the call before
+
+        monkeypatch.setattr(Model, "predict", predicting)
+        results = [[c.predicted_result for c in predictor.predict([_make_config({})])]]
+        results.append([c.predicted_result for c in predictor.predict([], True)])
+        monkeypatch.setattr(Model, "predict", proposing_nothing)
+        results.append([c.predicted_result for c in predictor.predict([_make_config({})])])
+
+        assert results == [[stored], [{}], [{}]]  # predicted, sampled, the model proposed nothing
+
+    def test_a_sampled_branch_adds_nothing_next_to_the_value_of_a_predicting_root(self, get_experiment, monkeypatch):
+        predictor = self._predictor(get_experiment, 11)
+        root = predictor.search_space.regions[0]
+        for model in predictor.mapping_region_model.values():
+            model.ranked_criteria = [Criterion("Y1", minimization=False)]  # an earlier call's, in the other direction
+        proposal = pd.DataFrame([{self.N0: f"{self.N0}.N01", "Y1": 0.5}])
+        predict_root = self._predicting(proposal, [Y1_MINIMIZED])
+
+        def predict(model, parameters, configurations):
+            return predict_root(model, parameters, configurations) if model.region == root else pd.DataFrame()
+
+        monkeypatch.setattr(Model, "predict", predict)
+
+        configurations = predictor.predict([_make_config({})])
+
+        assert [c.type for c in configurations] == [Configuration.Type.FROM_SELECTOR]
+        assert [c.predicted_result for c in configurations] == [{"Y1": {"Minimization": True, "Value": 0.5}}]
+

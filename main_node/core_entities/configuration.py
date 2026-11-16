@@ -61,7 +61,8 @@ class Configuration:
                                          result:                    shape - dict, keyed by objective name, e.g. ``{"energy": 700.56}``
                                          ResultValidityCheckMark:   shape - string, e.g. ``"OK"``, ``"Bad value"``, ``"Outlier"``, ``"Out of bounds"``
 
-        self.predicted_result:          shape - list, e.g. ``[0.0098776]``, one value per objective
+        self.predicted_result:          shape - dict, keyed by the name of the criterion the model ranked the configuration by,
+                                         e.g. ``{"energy": {"Minimization": True, "Value": 0.0098776}}``; ``{}`` if not predicted
         self._standard_deviation:        shape - list, e.g. ``[4.601357589523625]``, one value per objective
         self._evaluation_time:            shape - float or None, milliseconds, averaged over valid tasks
         self.type:                      shape - Configuration.Type, e.g   ``DEFAULT``
@@ -73,7 +74,7 @@ class Configuration:
         self.parameters = parameters
         self._tasks = {}
         self._results: Mapping = OrderedDict()
-        self.predicted_result = []
+        self.predicted_result = {}
         self.prediction_info = prediction_info
         self.type = config_type
         # Meta information
@@ -129,13 +130,6 @@ class Configuration:
         if results:
             data.update(self.results)
         return pd.Series(data, dtype='object')
-
-    def add_predicted_result(self, *args, **kwargs) -> None:
-        # the structure of predicted results should be revised to:
-        # 1. support tree-shaped search space
-        # 2. reflect the meaning of each model's prediction sense (regression surrogate prediction is real value, while
-        # TPE prediction is probability
-        raise NotImplementedError
 
     def add_task(self, task: Mapping, objectives: Objectives) -> None:
         """

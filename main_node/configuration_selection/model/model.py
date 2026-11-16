@@ -13,7 +13,7 @@ from configuration_selection.model.optimizer.optimizer_abs import Optimizer
 from configuration_selection.model.validator.validator_orchestrator import ValidatorOrchestrator
 from configuration_selection.model.candidate_selector.candidate_selector_orchestrator import CandidateSelectorOrchestrator
 from configuration_selection.model.surrogate.composite_surrogate import CompositeSurrogate
-from core_entities.objectives import Objectives
+from core_entities.objectives import Criterion, Objectives
 
 
 class Model:
@@ -98,15 +98,17 @@ class Model:
         # transfer learning
         self.time_to_build = None
         self.created_surrogates_descriptions_and_objectives_and_optimizer_descriptions = []
+        self.ranked_criteria: List[Criterion] = []  # what the last call's candidates are ranked by, in column order
 
     def predict(self, parameters: List[Hyperparameter], configurations: List[Configuration]) -> pd.DataFrame:
         """
         Encapsulates all model related functionality.
         """
-        # the build time and descriptions describe the last call only (transfer learning), so a call that builds
-        # nothing leaves none
+        # the build time, descriptions and ranked criteria describe the last call only (transfer learning, reported
+        # predictions), so a call that builds nothing leaves none
         self.time_to_build = None
         self.created_surrogates_descriptions_and_objectives_and_optimizer_descriptions = []
+        self.ranked_criteria = []
 
         # handle multiple objectives
         names_of_parameters = [p.name for p in parameters]
@@ -235,7 +237,6 @@ class Model:
 
         # run optimizer, calling the surrogate
         optimized_full = pd.DataFrame()
-        ranked_columns = []  # what the candidates are ranked by, named as the optimizers resolve it
         if self.mo_handling_surrogate_type != "Compositional":
             for s in created_surrogates:
                 for optimizer, objective in self.mapping_optimizer_objective.items():  # always 1 optimizer in 2.6.0
@@ -244,7 +245,7 @@ class Model:
                             "Optimizer": optimizer.optimizer_description} | {"Objectives_optimizer": objective.to_description()})
                     optimized = optimizer.optimize(s)
                     optimized_full = pd.concat([optimized_full, optimized])
-                    ranked_columns += [c.name for c in optimizer.resolve_criteria(s) if c.name not in ranked_columns]
+                    self._record_ranked_criteria(optimizer.resolve_criteria(s))
         else:
             composite_surrogate: CompositeSurrogate = created_surrogates[0]
             for s in composite_surrogate.surrogates:
@@ -255,15 +256,19 @@ class Model:
                                 "Optimizer": optimizer.optimizer_description} | {"Objectives_optimizer": objective.to_description()})
                         optimized = optimizer.optimize(s)
                         optimized_full = pd.concat([optimized_full, optimized])
-                        ranked_columns += [c.name for c in optimizer.resolve_criteria(s)
-                                           if c.name not in ranked_columns]
+                        self._record_ranked_criteria(optimizer.resolve_criteria(s))
 
         # select candidates
 
         selected_candidates = self.candidate_selector.select_candidates(
-            optimized_full[[r.name for r in self.region] + ranked_columns])
+            optimized_full[[r.name for r in self.region] + [c.name for c in self.ranked_criteria]])
 
         return pd.DataFrame(selected_candidates)
+
+    def _record_ranked_criteria(self, criteria: List[Criterion]) -> None:
+        """Remember the criteria the candidates are ranked by, named as the optimizers resolve them, once each."""
+        recorded = {c.name for c in self.ranked_criteria}
+        self.ranked_criteria += [c for c in criteria if c.name not in recorded]
 
     def update_surrogates_and_optimizers(self, surrogates_description_and_objectives_and_optimizers_description: List):
         """

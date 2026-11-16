@@ -11,6 +11,7 @@ from sklearn.linear_model import LinearRegression
 from default_config_handler.default_configuration_handler_orchestrator import DefaultConfigHandlerOrchestrator
 from core_entities.experiment import Experiment
 from core_entities.configuration import Configuration
+from core_entities.objectives import Criterion
 from core_entities.search_space import get_search_space_record
 from tools.restore_db import RestoreDB
 
@@ -695,7 +696,9 @@ class TestConfigurationSelection:
         # the model proposes the evaluated configuration, with other values in the parameters of the branch N02
         proposal = {**evaluated, f"{prefix}.N02.I1": 11, f"{prefix}.N02.O1": f"{prefix}.N02.O1.O11", "Y1": 1.0}
         region = cs.predictor.search_space.regions[0]
-        cs.predictor.mapping_region_model[region].predict = lambda parameters, configurations: pd.DataFrame([proposal])
+        model = cs.predictor.mapping_region_model[region]
+        model.predict = lambda parameters, configurations: pd.DataFrame([proposal])
+        model.ranked_criteria = [Criterion("Y1", minimization=True)]
 
         configurations, _ = cs.send_new_configurations_to_measure("", "", "", get_workers)
 

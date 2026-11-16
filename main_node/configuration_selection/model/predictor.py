@@ -7,7 +7,7 @@ import pandas as pd
 
 from configuration_selection.sampling.sampling_strategy_orchestrator import SamplingStrategyOrchestrator
 from core_entities.configuration import Configuration
-from core_entities.objectives import Objectives
+from core_entities.objectives import Criterion, Objectives
 from core_entities.search_space import Hyperparameter
 from core_entities.search_space import SearchSpace
 from tools.mongo_dao import MongoDB
@@ -86,6 +86,7 @@ class Predictor:
 
         predicted = pd.DataFrame()
         considered_hp_names = []
+        ranked_criteria: Dict[str, Criterion] = {}  # of the models that proposed in this call, by the name of their column
 
         while len(activated_regions) > 0:
             self.search_space.next_level()
@@ -143,6 +144,8 @@ class Predictor:
                 # if the model proposed it
                 if model_predicted:
                     model = self.mapping_region_model[region]
+                    for criterion in model.ranked_criteria:
+                        ranked_criteria.setdefault(criterion.name, criterion)
                     prediction_info[region_index] = {
                         "Model": model.created_surrogates_descriptions_and_objectives_and_optimizer_descriptions,
                         "time_to_build": model.time_to_build if model.time_to_build is not None else 0}
@@ -163,7 +166,9 @@ class Predictor:
             # a configuration is created for active parameters only
             configuration = Configuration(self.search_space.keep_active_parameters(parameters), configuration_type,
                                           self.experiment_id, prediction_info=prediction_info)
-            configuration.predicted_result = list(predicted_values.values())
+            configuration.predicted_result = {
+                name: {"Minimization": ranked_criteria[name].minimization, "Value": value}
+                for name, value in predicted_values.items()}
             predicted_configurations.append(configuration)
 
         self.search_space.reset_level()
