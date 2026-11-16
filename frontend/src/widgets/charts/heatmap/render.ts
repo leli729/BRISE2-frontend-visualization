@@ -22,6 +22,31 @@ function axisOf(parameter: string, trials: PointExp[], specsByName: Record<strin
     return hasInactive ? [INACTIVE_LABEL, ...categories] : categories
 }
 
+// the number of configurations of a cell listed in its hover
+const MAX_LISTED_CONFIGURATIONS = 10
+
+// a result in four significant digits
+function formatResult(result: unknown): string {
+    return typeof result === 'number' ? String(Number(result.toPrecision(4))) : String(result)
+}
+
+// the hover of a cell: the number of its configurations, then each with its active parameters and its result of the
+// objective, at most MAX_LISTED_CONFIGURATIONS of them
+function hoverOfCell(cell: PointExp[], objective: string): string {
+    if (cell.length === 0) return ''
+    const lines = [`${cell.length} configuration${cell.length === 1 ? '' : 's'}`]
+    for (const trial of cell.slice(0, MAX_LISTED_CONFIGURATIONS)) {
+        const parameters = Object.entries(trial.configurations)
+            .map(([name, value]) => `${cleanIdentifier(name)}=${cleanIdentifier(value)}`)
+            .join(', ')
+        lines.push(`${parameters}: ${formatResult(trial.results[objective])}`)
+    }
+    if (cell.length > MAX_LISTED_CONFIGURATIONS) {
+        lines.push(`and ${cell.length - MAX_LISTED_CONFIGURATIONS} more`)
+    }
+    return lines.join('<br>')
+}
+
 export function renderHeatmap(
     plotly: PlotlyInstance,
     element: HTMLElement,
@@ -41,28 +66,29 @@ export function renderHeatmap(
     const x = axisOf(param2, trials, specsByName)
 
     // a cell fixes the values of two parameters only, so configurations that differ in the others share it
-    const resultsOfCell = new Map<string, number[]>()
+    const trialsOfCell = new Map<string, PointExp[]>()
     for (const trial of trials) {
         const key = `${labelOf(trial, param1)},${labelOf(trial, param2)}`
-        resultsOfCell.set(key, [...(resultsOfCell.get(key) ?? []), trial.results[objective]])
+        trialsOfCell.set(key, [...(trialsOfCell.get(key) ?? []), trial])
     }
     const means = new Map<string, number>()
-    resultsOfCell.forEach((results, key) => means.set(key, results.reduce((sum, result) => sum + result, 0) / results.length))
-    const counts = y.map(yLabel => x.map(xLabel => resultsOfCell.get(`${yLabel},${xLabel}`)?.length ?? 0))
+    trialsOfCell.forEach((cell, key) =>
+        means.set(key, cell.reduce((sum, trial) => sum + trial.results[objective], 0) / cell.length))
+    const hovers = y.map(yLabel => x.map(xLabel => hoverOfCell(trialsOfCell.get(`${yLabel},${xLabel}`) ?? [], objective)))
 
     const data: Data[] = [
-        { // the cells: the mean result of the configurations at the two values, with their number in the hover
+        { // the cells: the mean result of the configurations at the two values, with the configurations in the hover
             type: theme.value.type as 'heatmap',
             z: DataTransformer.buildZMatrix(x, y, means),
             x,
             y,
-            customdata: counts,
+            customdata: hovers,
             hoverongaps: false,
             hovertemplate:
                 `${cleanIdentifier(param1)}: %{y}<br>` +
                 `${cleanIdentifier(param2)}: %{x}<br>` +
-                `${objective}: %{z}<br>` +
-                'configurations: %{customdata}<extra></extra>',
+                `${objective} (mean): %{z}<br>` +
+                '%{customdata}<extra></extra>',
             colorscale: theme.value.color,
             zsmooth: theme.value.smooth as 'fast' | 'best' | false
         },

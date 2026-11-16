@@ -110,12 +110,47 @@ describe('renderHeatmap', () => {
         expect(surface.z).toEqual([[null, null, null], [100, null, null]])
     })
 
-    it('tells in the hover of a cell how many configurations it holds', () => {
+    // the hover of a cell: its first line tells the number of configurations, the others list them
+    const hoverLines = (cell: unknown): string[] => (cell as string).split('<br>')
+
+    it('tells in the hover of a cell how many configurations it holds, none for an empty cell', () => {
         const { surface } = draw([n01n11, n02o11, n02o12])
 
-        expect(surface.customdata).toEqual([[0, 1, 0], [2, 0, 0]])
+        expect(hoverLines(surface.customdata[0][1])[0]).toBe('1 configuration')
+        expect(hoverLines(surface.customdata[1][0])[0]).toBe('2 configurations')
+        expect(surface.customdata[0][0]).toBe('')
         expect(surface.hovertemplate).toContain('%{z}')
         expect(surface.hovertemplate).toContain('%{customdata}')
+    })
+
+    it('lists in the hover the configurations of a cell with all their parameters and their result', () => {
+        const { surface } = draw([n01n11, n02o11, n02o12])
+
+        expect(hoverLines(surface.customdata[0][1]).slice(1)).toEqual(['N0=N01, N1=N11: 5'])
+        expect(hoverLines(surface.customdata[1][0]).slice(1)).toEqual(['N0=N02, O1=O11: 9', 'N0=N02, O1=O12: 11'])
+    })
+
+    it('lists in the hover the result of the selected objective only', () => {
+        const { surface } = draw([n02o11, n02o12], N0, N1, 'energy')
+
+        expect(hoverLines(surface.customdata[1][0]).slice(1)).toEqual(['N0=N02, O1=O11: 90', 'N0=N02, O1=O12: 110'])
+    })
+
+    it('rounds a result in the hover to four significant digits', () => {
+        const { surface } = draw([trial({ [N0]: `${N0}.N02` }, { runtime: 0.123456 })])
+
+        expect(hoverLines(surface.customdata[1][0]).slice(1)).toEqual(['N0=N02: 0.1235'])
+    })
+
+    it('lists at most ten configurations of a cell in the hover and counts the others', () => {
+        const repeats = Array.from({ length: 12 }, (_, index) => trial({ [N0]: `${N0}.N02` }, { runtime: index }))
+        const { surface } = draw(repeats)
+
+        const lines = hoverLines(surface.customdata[1][0])
+        expect(lines[0]).toBe('12 configurations')
+        expect(lines.slice(1, 11)).toEqual(repeats.slice(0, 10).map((_, index) => `N0=N02: ${index}`))
+        expect(lines[11]).toBe('and 2 more')
+        expect(lines).toHaveLength(12)
     })
 
     it('marks the solution without counting it again in its cell', () => {
@@ -123,7 +158,8 @@ describe('renderHeatmap', () => {
 
         expect(star.x).toEqual(['N12'])
         expect(surface.z).toEqual([[5, 7], [null, null]])
-        expect(surface.customdata).toEqual([[1, 1], [0, 0]])
+        expect(hoverLines(surface.customdata[0][0])[0]).toBe('1 configuration')
+        expect(hoverLines(surface.customdata[0][1])[0]).toBe('1 configuration')
     })
 
     it('marks the measured configurations by crosses in their cells, the inactive ones included', () => {
