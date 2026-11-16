@@ -261,6 +261,8 @@ ConfigurationSelection {
               WeightedSum {
                 Weights -> floatArray
                 [size Weights == size childs.Context.TaskConfiguration.Objectives]
+                [min Weights >= 0]
+                [max Weights > 0]
                 Type -> predefined
                 [Type = "weighted_sum"]
             }
@@ -479,6 +481,8 @@ ConfigurationSelection {
             WeightedSum {
               Weights -> floatArray
               [size Weights == size childs.Context.TaskConfiguration.Objectives]
+              [min Weights >= 0]
+              [max Weights > 0]
               Type -> predefined
               [Type = "weighted_sum"]
             }
