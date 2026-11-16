@@ -296,8 +296,7 @@
             "SlicePlot": {},
             "ContourPlot": {},
             "ParetoFront": {},
-            "EDFPlot": {},
-            "Heatmap": {}
+            "EDFPlot": {}
         }
     }
 }

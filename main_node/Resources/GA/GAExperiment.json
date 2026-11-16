@@ -221,8 +221,7 @@
             "HyperparameterImportances": {},
             "SlicePlot": {},
             "ContourPlot": {},
-            "EDFPlot": {},
-            "Heatmap": {}
+            "EDFPlot": {}
         }
     }
 }
