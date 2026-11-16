@@ -27,8 +27,8 @@ class TestUpdatePrediction:
 
     def test_updating_prediction_with_colliding_objective_columns(self):
         """
-        Each hierarchical region's model predicts the same objective column names, so merging several regions'
-        predictions must rename those columns.
+        Each region's model ranks by columns of the same names, so every region's columns are renamed by the region's
+        index: the merge keeps them apart, and the predicted result is split back into regions by the suffix.
         """
         region_names = [f"hp{i}" for i in range(4)]
         predicted = pd.DataFrame()
@@ -44,11 +44,11 @@ class TestUpdatePrediction:
         assert len(set(objective_columns)) == len(objective_columns)
         assert sorted(predicted[objective_columns].iloc[0].tolist()) == [0.0, 1.0, 2.0, 3.0]
 
-    def test_updating_prediction_with_no_prior_predictions_returns_partial_configuration_unchanged(self):
+    def test_updating_prediction_with_no_prior_predictions_suffixes_the_objective_columns_of_the_first_region(self):
         partial_configuration = pd.DataFrame({"hp0": [1], "Y1": [0.5]})
         merged = Predictor._update_prediction(None, pd.DataFrame(), partial_configuration, "0", ["hp0"])
 
-        pd.testing.assert_frame_equal(merged, partial_configuration)
+        pd.testing.assert_frame_equal(merged, pd.DataFrame({"hp0": [1], "Y1__region0": [0.5]}))
 
 
 class TestConsideredConfigsForRegion:
@@ -108,30 +108,6 @@ class TestConsideredConfigsForRegion:
         assert base_considered_configs == original
 
 
-class TestAveragePredictionsPerObjective:
-
-    def test_predictions_of_one_objective_from_several_regions_are_averaged(self):
-        predicted_values = pd.Series({"Y1": 1.0, "Y1__region2": 2.0, "Y1__region3": 6.0})
-        averaged = Predictor._average_predictions_per_objective(None, predicted_values)
-
-        assert averaged == {"Y1": 3.0}
-
-    def test_every_objective_keeps_its_own_average(self):
-        predicted_values = pd.Series(
-            {"Y1": 1.0, "Y2": 10.0, "Y1__region2": 3.0, "Y2__region2": 20.0}
-        )
-        averaged = Predictor._average_predictions_per_objective(None, predicted_values)
-
-        assert averaged == {"Y1": 2.0, "Y2": 15.0}
-        assert list(averaged.keys()) == ["Y1", "Y2"]
-
-    def test_single_region_prediction_is_returned_as_is(self):
-        predicted_values = pd.Series({"Y1": 0.5})
-        averaged = Predictor._average_predictions_per_objective(None, predicted_values)
-
-        assert averaged == {"Y1": 0.5}
-
-
 class TestPredictedConfigurationsHoldOnlyActiveParameters:
     """
     'test_case_13' is flat, 'test_case_11' is hierarchical; both have the branches N01 {F1, N1} and N02 {I1, O1}
@@ -182,7 +158,7 @@ class TestPredictedConfigurationsHoldOnlyActiveParameters:
             self.BRANCH_PARAMETERS[f"{self.N0}.N01"], self.BRANCH_PARAMETERS[f"{self.N0}.N02"]]
         assert [c.parameters[f"{self.N0}.N01.F1"] for c in configurations[:1]] == [1.0]
         assert [c.predicted_result for c in configurations] == [
-            {"Y1": {"Minimization": True, "Value": 0.5}}, {"Y1": {"Minimization": True, "Value": 0.6}}]
+            {"0": {"Y1": {"Minimization": True, "Value": 0.5}}}, {"0": {"Y1": {"Minimization": True, "Value": 0.6}}}]
 
 
 class TestPredictionInfoNamesTheModelsThatPredictedTheConfiguration:
@@ -322,10 +298,12 @@ class TestPredictionInfoNamesTheModelsThatPredictedTheConfiguration:
 
 class TestPredictedResultNamesEachValueWithItsDirection:
     """
-    A configuration's predicted result holds, for every value its model ranked the candidates by, the name of the
-    criterion, the direction it is ranked in and the value; a region that did not predict adds nothing.
-    'test_case_13' is flat (one region), 'test_case_11' hierarchical: region 0 is the root (N0), region 1 the branch N01
-    (F1, N1).
+    A configuration's predicted result holds, for every region whose model predicted it, the values the model ranked the
+    candidates by: the name of the criterion, the direction it is ranked in and the value, under the region's index (the
+    key of the region in the prediction information); a region that did not predict adds nothing.
+    'test_case_13' is flat (one region), 'test_case_11' and 'test_case_12' hierarchical, with the same search space:
+    region 0 is the root (N0), region 1 the branch N01 (F1, N1); the root of both is ranked by a bandit, the branch of
+    'test_case_12' by a TPE.
     """
 
     N0 = "Context.SearchSpace.N0"
@@ -356,8 +334,9 @@ class TestPredictedResultNamesEachValueWithItsDirection:
     @pytest.mark.parametrize("criteria, values, expected", [
         # Y2 is not an objective of test case 13: the directions come from the model, not from the experiment
         ([Y1_MINIMIZED, Criterion("Y2", False)], {"Y1": 0.5, "Y2": 0.7},
-         {"Y1": {"Minimization": True, "Value": 0.5}, "Y2": {"Minimization": False, "Value": 0.7}}),
-        ([Criterion("ratio(Y1)", False)], {"ratio(Y1)": 1.7}, {"ratio(Y1)": {"Minimization": False, "Value": 1.7}}),
+         {"0": {"Y1": {"Minimization": True, "Value": 0.5}, "Y2": {"Minimization": False, "Value": 0.7}}}),
+        ([Criterion("ratio(Y1)", False)], {"ratio(Y1)": 1.7},
+         {"0": {"ratio(Y1)": {"Minimization": False, "Value": 1.7}}}),
     ], ids=["two_criteria_in_their_own_directions", "derived_value"])
     def test_each_ranked_value_is_stored_under_its_name_with_its_direction(
             self, get_experiment, monkeypatch, criteria, values, expected):
@@ -378,7 +357,7 @@ class TestPredictedResultNamesEachValueWithItsDirection:
 
     def test_each_call_holds_the_predicted_result_of_its_own_proposal_only(self, get_experiment, monkeypatch):
         predictor = self._predictor(get_experiment, 13)
-        stored = {"Y1": {"Minimization": True, "Value": 0.5}}
+        stored = {"0": {"Y1": {"Minimization": True, "Value": 0.5}}}
         predicting = self._predicting(self._flat_proposal(Y1=0.5), [Y1_MINIMIZED])
         proposing_nothing = lambda model, parameters, configurations: pd.DataFrame()  # keeps the criteria of the call before
 
@@ -389,6 +368,34 @@ class TestPredictedResultNamesEachValueWithItsDirection:
         results.append([c.predicted_result for c in predictor.predict([_make_config({})])])
 
         assert results == [[stored], [{}], [{}]]  # predicted, sampled, the model proposed nothing
+
+    @pytest.mark.parametrize("root_criterion, branch_criterion", [
+        (Y1_MINIMIZED, Y1_MINIMIZED),  # the average of the two values was stored
+        (Criterion("ucb(Y1)", False), Criterion("ratio(Y1)", False)),  # what the bandit and the TPE of the case rank by
+    ], ids=["same_criterion", "different_criteria"])
+    def test_every_predicting_region_keeps_its_values_under_its_index(
+            self, get_experiment, monkeypatch, root_criterion, branch_criterion):
+        predictor = self._predictor(get_experiment, 12)
+        root = predictor.search_space.regions[0]
+        n0 = self.N0
+        predict_root = self._predicting(
+            pd.DataFrame([{n0: f"{n0}.N01", root_criterion.name: 0.5}]), [root_criterion])
+        predict_branch = self._predicting(
+            pd.DataFrame([{f"{n0}.N01.F1": 1.0, f"{n0}.N01.N1": f"{n0}.N01.N1.N11", branch_criterion.name: 0.6}]),
+            [branch_criterion])
+
+        def predict(model, parameters, configurations):
+            return (predict_root if model.region == root else predict_branch)(model, parameters, configurations)
+
+        monkeypatch.setattr(Model, "predict", predict)
+
+        configurations = predictor.predict([_make_config({})])
+
+        assert [c.type for c in configurations] == [Configuration.Type.PREDICTED]
+        assert [c.predicted_result for c in configurations] == [{
+            "0": {root_criterion.name: {"Minimization": root_criterion.minimization, "Value": 0.5}},
+            "1": {branch_criterion.name: {"Minimization": branch_criterion.minimization, "Value": 0.6}}}]
+        assert set(configurations[0].predicted_result) == set(configurations[0].prediction_info)
 
     def test_a_sampled_branch_adds_nothing_next_to_the_value_of_a_predicting_root(self, get_experiment, monkeypatch):
         predictor = self._predictor(get_experiment, 11)
@@ -406,5 +413,5 @@ class TestPredictedResultNamesEachValueWithItsDirection:
         configurations = predictor.predict([_make_config({})])
 
         assert [c.type for c in configurations] == [Configuration.Type.FROM_SELECTOR]
-        assert [c.predicted_result for c in configurations] == [{"Y1": {"Minimization": True, "Value": 0.5}}]
+        assert [c.predicted_result for c in configurations] == [{"0": {"Y1": {"Minimization": True, "Value": 0.5}}}]
 

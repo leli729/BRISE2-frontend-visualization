@@ -86,7 +86,7 @@ class Predictor:
 
         predicted = pd.DataFrame()
         considered_hp_names = []
-        ranked_criteria: Dict[str, Criterion] = {}  # of the models that proposed in this call, by the name of their column
+        ranked_criteria: Dict[str, List[Criterion]] = {}  # of the models that proposed in this call, by region index
 
         while len(activated_regions) > 0:
             self.search_space.next_level()
@@ -144,8 +144,7 @@ class Predictor:
                 # if the model proposed it
                 if model_predicted:
                     model = self.mapping_region_model[region]
-                    for criterion in model.ranked_criteria:
-                        ranked_criteria.setdefault(criterion.name, criterion)
+                    ranked_criteria[region_index] = list(model.ranked_criteria)
                     prediction_info[region_index] = {
                         "Model": model.created_surrogates_descriptions_and_objectives_and_optimizer_descriptions,
                         "time_to_build": model.time_to_build if model.time_to_build is not None else 0}
@@ -159,16 +158,15 @@ class Predictor:
         for i, f in predicted.iterrows():
             if not sample:
                 parameters = f.drop(predicted.columns.difference(considered_hp_names)).to_dict()
-                predicted_values = self._average_predictions_per_objective(f.drop(considered_hp_names))
             else:
                 parameters = f.to_dict()
-                predicted_values = {}
             # a configuration is created for active parameters only
             configuration = Configuration(self.search_space.keep_active_parameters(parameters), configuration_type,
                                           self.experiment_id, prediction_info=prediction_info)
-            configuration.predicted_result = {
-                name: {"Minimization": ranked_criteria[name].minimization, "Value": value}
-                for name, value in predicted_values.items()}
+            for region_index, criteria in ranked_criteria.items():
+                for criterion in criteria:
+                    configuration.add_predicted_result(
+                        region_index, criterion, f[f"{criterion.name}{REGION_COLUMN_SUFFIX}{region_index}"])
             predicted_configurations.append(configuration)
 
         self.search_space.reset_level()
@@ -207,30 +205,15 @@ class Predictor:
     def _update_prediction(self, predicted: pd.DataFrame, partial_configuration: pd.DataFrame,
                                   region_index: str, considered_hp_names_in_region: List[str]) -> pd.DataFrame:
         """
-        Update prediction with a partial configuration. Objective columns are renamed region-wise for merging.  
+        Update prediction with a partial configuration. Objective columns are renamed region-wise: the merge keeps
+        the regions' values apart, and the predicted result is split back into regions by the suffix.
         """
-        if predicted.empty:
-            return partial_configuration
         objective_columns = partial_configuration.columns.difference(considered_hp_names_in_region)
         partial_configuration = partial_configuration.rename(
             columns={c: f"{c}{REGION_COLUMN_SUFFIX}{region_index}" for c in objective_columns})
+        if predicted.empty:
+            return partial_configuration
         return pd.merge(predicted, partial_configuration, left_index=True, right_index=True)
-
-    def _average_predictions_per_objective(self, predicted_values: pd.Series) -> Dict[str, float]:
-        """
-        Every region's model predicts all objectives, they are merged into a single value per objective. 
-        """
-        values_per_objective: Dict[str, List[float]] = {}
-        for column_name in predicted_values.index:
-            objective_name = column_name.split(REGION_COLUMN_SUFFIX)[0]
-            if objective_name not in values_per_objective:
-                values_per_objective[objective_name] = []
-            values_per_objective[objective_name].append(predicted_values[column_name])
-
-        averaged_values = {}
-        for objective_name, values in values_per_objective.items():
-            averaged_values[objective_name] = sum(values) / len(values)
-        return averaged_values
 
     def store_model_dumps_to_db(self):
         # initialize connection to the database

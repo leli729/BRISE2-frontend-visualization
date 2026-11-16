@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Mapping, MutableMapping, Tuple
 
 import pandas as pd
 
-from core_entities.objectives import Objectives
+from core_entities.objectives import Criterion, Objectives
 from tools.front_API import API
 
 
@@ -61,8 +61,10 @@ class Configuration:
                                          result:                    shape - dict, keyed by objective name, e.g. ``{"energy": 700.56}``
                                          ResultValidityCheckMark:   shape - string, e.g. ``"OK"``, ``"Bad value"``, ``"Outlier"``, ``"Out of bounds"``
 
-        self.predicted_result:          shape - dict, keyed by the name of the criterion the model ranked the configuration by,
-                                         e.g. ``{"energy": {"Minimization": True, "Value": 0.0098776}}``; ``{}`` if not predicted
+        self.predicted_result:          shape - dict, keyed by the index of the region whose model predicted the configuration, then by
+                                         the name of the criterion the model ranked it by,
+                                         e.g. ``{"0": {"energy": {"Minimization": True, "Value": 0.0098776}}}``;
+                                         ``{}`` if not predicted; filled by ``add_predicted_result``
         self._standard_deviation:        shape - list, e.g. ``[4.601357589523625]``, one value per objective
         self._evaluation_time:            shape - float or None, milliseconds, averaged over valid tasks
         self.type:                      shape - Configuration.Type, e.g   ``DEFAULT``
@@ -130,6 +132,14 @@ class Configuration:
         if results:
             data.update(self.results)
         return pd.Series(data, dtype='object')
+
+    def add_predicted_result(self, region_index: str, criterion: Criterion, value: float) -> None:
+        """
+        Add the value a region's model ranked the configuration by, with the direction it is ranked in.
+        The value is stored as a float: a numpy integer cannot be encoded by the database.
+        """
+        self.predicted_result.setdefault(region_index, {})[criterion.name] = {
+            "Minimization": criterion.minimization, "Value": float(value)}
 
     def add_task(self, task: Mapping, objectives: Objectives) -> None:
         """
