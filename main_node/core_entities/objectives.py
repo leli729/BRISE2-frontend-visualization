@@ -8,7 +8,7 @@ from typing import Dict, Iterable, Iterator, List, Mapping, Tuple
 class Criterion:
     """
     A value that candidates are ranked by, with the direction it is ranked in: an objective, or a value derived from
-    objectives (the scalarized Y, the ratio of an acquisition function, the upper confidence bound of a bandit).
+    objectives (a weighted sum, the ratio of an acquisition function, the upper confidence bound of a bandit).
     """
     name: str
     minimization: bool
