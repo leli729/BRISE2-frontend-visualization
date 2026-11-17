@@ -417,7 +417,6 @@ ConfigurationSelection {
             [self excludes parent.parent.parent.Validator.ExternalValidator.EnergyValidator]
             [self excludes parent.parent.parent.Validator.InternalValidator]
             [fcard.parent.parent.ConfigurationTransformers == 0]
-            [size (filter childs.Context.TaskConfiguration.Objectives where Minimization == True) == 0]
             Type -> predefined
             [Type = "multi_armed_bandit"]
           }

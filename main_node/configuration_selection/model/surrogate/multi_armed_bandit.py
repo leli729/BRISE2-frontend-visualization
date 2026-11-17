@@ -13,7 +13,6 @@ class MultiArmedBandit(Surrogate):
 
     def __init__(self, surrogate_description: Dict, region: Tuple, objectives: Objectives):
         super().__init__(surrogate_description, region, objectives)
-        self.objective = next(iter(self.objectives))  # FRAMAB is always single-objective
         self.multi_objective = surrogate_description['Instance']['MultiArmedBandit']['MultiObjective']
         self.c = surrogate_description['Instance']['MultiArmedBandit']['Parameters']['c']
 
@@ -22,9 +21,6 @@ class MultiArmedBandit(Surrogate):
         return tuple(Criterion.derived("ucb", [label], minimization=False) for label in self._label_criteria())
 
     def create(self, features: pd.DataFrame, labels: pd.DataFrame) -> bool:
-        if self.objective.minimization:
-            raise TypeError("Multi Armed Bandit optimizer performs only maximization tasks!")
-
         transformed_features = self._transform_configuration(features)
         transformed_labels = self._transform_values_to_maximize(labels)  # the rewards: a higher label is better
 

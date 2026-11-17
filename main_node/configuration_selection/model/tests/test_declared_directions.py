@@ -296,6 +296,30 @@ class TestSurrogatesUnderAScalarizer:
         assert upper_confidence_bound(first.categories[-1]) > upper_confidence_bound(first.categories[0])
 
 
+class TestSurrogatesLearnInTheDeclaredDirection:
+    """A surrogate that learns from the results of its objectives reads each in the direction it is declared in."""
+
+    @pytest.mark.parametrize("minimization, better, worse", [(False, -1, 0), (True, 0, -1)],
+                             ids=["maximized", "minimized"])
+    def test_a_multi_armed_bandit_prefers_the_categories_of_better_results_in_the_direction_of_its_objective(
+            self, get_experiment, minimization, better, worse):
+        description, search_space = get_experiment(11)  # the bandit's region is the root, a categorical parameter
+        region = search_space.regions[0]
+        objectives = _named_objectives(Y1=minimization)
+        surrogate = SurrogateOrchestrator().get_surrogate(
+            copy.deepcopy(description["ConfigurationSelection"]["Predictor"]["Model_0"]["Surrogate"]), region, objectives)
+        # the result of a configuration is the index of its first parameter's category: the last category has the highest
+        assert surrogate.create(*_categorical_observations(region, objectives, rng=np.random.default_rng(0)))
+        first = region[0]
+
+        def upper_confidence_bound(category):
+            configuration = pd.Series({hp.name: hp.categories[0] for hp in region})
+            configuration[first.name] = category
+            return surrogate.predict(configuration)["ucb(Y1)"].iloc[0]
+
+        assert upper_confidence_bound(first.categories[better]) > upper_confidence_bound(first.categories[worse])
+
+
 class TestPredictedColumnsAreTheDeclaredOnes:
     """A surrogate names the columns it predicts by the criteria it declares, so that candidates are ranked by them."""
 
