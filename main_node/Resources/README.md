@@ -99,7 +99,7 @@ A surrogate requires a `Nominal Transformer` for nominal parameters and an `Ordi
 ##### Value Transformer
 Value transformers perform adaptation of the objective function  to the requirements of the respective variant. 
 We offer two types of value transformation: 
-* `Scalarizing` is necessary to handle a multi-objective problem with a single-objective surrogate. 
+* `Scalarizing` is necessary to handle a multi-objective problem with a single-objective surrogate. There are two scalarizers: the weighted sum, and the normalized weighted sum. Normalized weighted sum scales every objective by its expected bounds (where 0 is the best value, 1 is the worst). The feature model allows the normalized one only when every bound is finite and `MaxExpectedValue` is above `MinExpectedValue`. 
 * `Acquisition Function `is a mandatory part of optimization with Bayesian surrogates, which leverages uncertainty of a probabilistic model to find promising candidates.
 
 #### Repetition management

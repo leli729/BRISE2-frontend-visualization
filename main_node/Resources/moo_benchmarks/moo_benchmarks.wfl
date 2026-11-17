@@ -53,6 +53,11 @@ abstract Objective {
     Minimization -> predefined
     MinExpectedValue -> predefined
     MaxExpectedValue -> predefined
+    [MaxExpectedValue > MinExpectedValue]
+    // NormalizedWeightedSum scales every objective by its expected bounds, so they must be finite. Infinity and "inf"
+    // are read as float('inf'); they are compared with the largest float, because the grammar has no -Infinity.
+    [if MaxExpectedValue >= 1.7976931348623157e308 or MinExpectedValue <= -1.7976931348623157e308 then self excludes ConfigurationSelection.Predictor.Model.Surrogate.ValueTransformers.ValueScalarizator.NormalizedWeightedSum]
+    [if MaxExpectedValue >= 1.7976931348623157e308 or MinExpectedValue <= -1.7976931348623157e308 then self excludes ConfigurationSelection.Predictor.Model.Optimizer.ValueTransformers.ValueScalarizator.NormalizedWeightedSum]
 }
 abstract SC {
   Type -> predefined
@@ -286,6 +291,14 @@ ConfigurationSelection {
                 Type -> predefined
                 [Type = "weighted_sum"]
             }
+              NormalizedWeightedSum {
+                Weights -> floatArray
+                [size Weights == size childs.Context.TaskConfiguration.Objectives]
+                [min Weights >= 0]
+                [max Weights > 0]
+                Type -> predefined
+                [Type = "normalized_weighted_sum"]
+            }
             [self excludes parent.parent.parent.Optimizer.ValueTransformers.ValueScalarizator]
           }
         }
@@ -505,6 +518,14 @@ ConfigurationSelection {
               [max Weights > 0]
               Type -> predefined
               [Type = "weighted_sum"]
+            }
+            NormalizedWeightedSum {
+              Weights -> floatArray
+              [size Weights == size childs.Context.TaskConfiguration.Objectives]
+              [min Weights >= 0]
+              [max Weights > 0]
+              Type -> predefined
+              [Type = "normalized_weighted_sum"]
             }
           }
           xor AcquisitionFunction {
