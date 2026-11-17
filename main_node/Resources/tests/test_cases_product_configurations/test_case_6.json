@@ -169,14 +169,6 @@
                             "Class": "sklearn.linear_model.LinearRegression"
                         }
                     }
-                },
-                "Surrogate_2": {
-                    "Instance": {
-                        "ModelMock": {
-                            "MultiObjective": true,
-                            "Type": "model_mock"
-                        }
-                    }
                 }
             }
         }

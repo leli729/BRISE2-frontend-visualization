@@ -227,7 +227,7 @@ class TestInput:
 
     def test_5(self):
         """
-        ['2 float', 'flat', '2-mo', 'dynamic', 'mock', 'sklearn', 'sklearn', 'sklearn', 'sklearn', 'surr.vt.none',
+        ['2 float', 'flat', '2-mo', 'dynamic', 'gpr', 'sklearn', 'sklearn', 'sklearn', 'sklearn', 'surr.vt.none',
         'surr.ct.none', 'optimizer.moead', 'opt.vt.none', 'opt.ct', 'validator.quality', 'validator.internal',
          'cs.random', 'ted.none', 'mr.none', 'mtl.none',
         'sc.time', 'rm.experiment_aware', 'dch.random', 'ss.mersenne']
@@ -246,7 +246,7 @@ class TestInput:
         r = RepeaterOrchestration(experiment_id=experiment.unique_id, experiment=experiment)
         assert isinstance(r.get_repeater(), AcceptableErrorBasedType)
         cs = ConfigurationSelection(experiment=experiment)
-        assert len(list(list(cs.predictor.mapping_region_model.values())[0].mapping_surrogate_objective.keys())[0].mapping_config_transformer_parameter) == 0
+        assert len(list(list(cs.predictor.mapping_region_model.values())[0].mapping_surrogate_objective.keys())[0].mapping_config_transformer_parameter) == 1  # the nominal transformer of the first surrogate
         assert len(list(list(cs.predictor.mapping_region_model.values())[0].mapping_surrogate_objective.keys())[0].value_transformers) == 0
         assert len(list(list(cs.predictor.mapping_region_model.values())[0].mapping_optimizer_objective.keys())[0].mapping_config_transformer_parameter) == 3
         assert len(list(list(cs.predictor.mapping_region_model.values())[0].mapping_optimizer_objective.keys())[0].value_transformers) == 0
@@ -262,7 +262,7 @@ class TestInput:
         assert "TransferLearning" not in experiment.description.keys()
     def test_6(self):
         """
-         ['1 float 1 nom', 'flat', '5-mo', 'pf', 'gpr', 'lr', 'mock', 'surr.vt.none',
+         ['1 float 1 nom', 'flat', '5-mo', 'pf', 'gpr', 'lr', 'surr.vt.none',
          'surr.ct', 'optimizer.random', 'opt.vt.none', 'opt.ct','validator.quality', 'validator.internal',
          'cs.random', 'ted.none', 'mr.none', 'mtl.none', 'sc.guaranteed', 'rm.quality', 'dch.none', 'ss.mersenne']
         """
@@ -335,7 +335,7 @@ class TestInput:
 
     def test_8(self):
         """
-         ['1 nom 1 float 1 nom 1 int 1 ord', 'hierarchical', '2-mo', 'scalar-pf', 'mab', 'lr-gbr-brr-mock',
+         ['1 nom 1 float 1 nom 1 int 1 ord', 'hierarchical', '2-mo', 'scalar-pf', 'mab', 'lr-gbr-brr-gpr',
          'surr.vt', 'surr.ct', 'optimizer.random', 'opt.vt.none', 'opt.ct.none',
          'validator.mock-q', 'validator.internal.none-y', 'cs.best', 'ted.none',
          'mr.none', 'mtl.none', 'sc.time', 'rm.quality', 'dch.none', 'ss.sobol']

@@ -377,7 +377,11 @@ ConfigurationSelection {
             [if CType == "float" then self.Parameters.c == self.CFloat]
             [if CType == "std" then self.Parameters.c == "std"]
             [CFloat > 0]
-            [self requires parent.parent.parent.Validator.ExternalValidator.MockValidator]
+            // the bandit predicts upper confidence bounds, not objectives: only MockValidator can validate it. One excludes
+            // per other external validator, because Waffle does not enforce a requires on a child of an xor group;
+            // replace by [self requires parent.parent.parent.Validator.ExternalValidator.MockValidator] once it does.
+            [self excludes parent.parent.parent.Validator.ExternalValidator.QualityValidator]
+            [self excludes parent.parent.parent.Validator.ExternalValidator.EnergyValidator]
             [self excludes parent.parent.parent.Validator.InternalValidator]
             [fcard.parent.parent.ConfigurationTransformers == 0]
             [size (filter childs.Context.TaskConfiguration.Objectives where Minimization == True) == 0]
@@ -403,7 +407,9 @@ ConfigurationSelection {
             }
             [self requires parent.parent.parent.Optimizer.ValueTransformers]
             [self requires parent.parent.parent.Optimizer.ValueTransformers.AcquisitionFunction.TPE_EI]
-            [self requires parent.parent.parent.Validator.MockValidator]
+            // the TPE predicts densities, not objectives: only MockValidator can validate it (see MultiArmedBandit)
+            [self excludes parent.parent.parent.Validator.ExternalValidator.QualityValidator]
+            [self excludes parent.parent.parent.Validator.ExternalValidator.EnergyValidator]
             [self requires parent.parent.ConfigurationTransformers.OrdinalTransformer]
             [self requires parent.parent.ConfigurationTransformers.OrdinalTransformer.SklearnOrdinalEncoder]
             [self requires parent.parent.ConfigurationTransformers.NominalTransformer]
@@ -451,6 +457,9 @@ ConfigurationSelection {
             MultiObjective -> predefined
             [MultiObjective = True]
 
+            // the mock draws random values, not predictions: only MockValidator can validate it (see MultiArmedBandit)
+            [self excludes parent.parent.parent.Validator.ExternalValidator.QualityValidator]
+            [self excludes parent.parent.parent.Validator.ExternalValidator.EnergyValidator]
             Type -> predefined
             [Type = "model_mock"]
           }
@@ -525,7 +534,7 @@ ConfigurationSelection {
           xor AcquisitionFunction {
             TPE_EI {
               // TPE_EI needs a TPE surrogate in the same Model. Written as one excludes per other surrogate, because Waffle
-              // does not enforce a requires on a child of an xor group (bug 1); replace by one requires once it does.
+              // does not enforce a requires on a child of an xor group; replace by one requires once it does.
               [self excludes parent.parent.parent.parent.Surrogate.Instance.LinearRegression]
               [self excludes parent.parent.parent.parent.Surrogate.Instance.SupportVectorRegression]
               [self excludes parent.parent.parent.parent.Surrogate.Instance.GradientBoostingRegressor]

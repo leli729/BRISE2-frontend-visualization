@@ -220,7 +220,7 @@ class TestConfigurationSelection:
 
     def test_5(self, get_experiment, get_workers, get_configurations_2_float):
         """
-        ['2 float', 'flat', '2-mo', 'dynamic', 'mock', 'sklearn', 'sklearn', 'sklearn', 'sklearn', 'surr.vt.none',
+        ['2 float', 'flat', '2-mo', 'dynamic', 'gpr', 'sklearn', 'sklearn', 'sklearn', 'sklearn', 'surr.vt.none',
         'surr.ct.none', 'optimizer.moead', 'opt.vt.none', 'opt.ct', 'validator.quality', 'validator.internal',
          'cs.random', 'ted.none', 'mr.none', 'mtl.none',
         'sc.time', 'rm.experiment_aware', 'dch.random', 'ss.mersenne']
@@ -263,7 +263,7 @@ class TestConfigurationSelection:
 
     def test_6(self, get_experiment, get_workers, get_configurations_float_nom):
         """
-         ['1 float 1 nom', 'flat', '5-mo', 'pf', 'gpr', 'lr', 'mock', 'surr.vt.none',
+         ['1 float 1 nom', 'flat', '5-mo', 'pf', 'gpr', 'lr', 'surr.vt.none',
          'surr.ct', 'optimizer.random', 'opt.vt.none', 'opt.ct','validator.quality', 'validator.internal',
          'cs.random', 'ted.none', 'mr.none', 'mtl.none', 'sc.guaranteed', 'rm.quality', 'dch.none', 'ss.mersenne']
         """
@@ -283,7 +283,7 @@ class TestConfigurationSelection:
 
 
         temp_region = list(cs.predictor.mapping_region_model.keys())[0]
-        assert len(cs.predictor.mapping_region_model[temp_region].mapping_surrogate_objective) == 17  # Portfolio 5 Obj 3 Surr 2 MO 15 + 2
+        assert len(cs.predictor.mapping_region_model[temp_region].mapping_surrogate_objective) == 11  # Portfolio 5 Obj 2 Surr 1 MO 10 + 1
         assert any([c.type is Configuration.Type.PREDICTED for c in configs])
 
     def test_7(self, get_experiment, get_workers, get_configurations_2_float):
@@ -323,7 +323,7 @@ class TestConfigurationSelection:
 
     def test_8(self, get_experiment, get_workers, get_configurations_all_types):
         """
-         ['1 nom 1 float 1 nom 1 int 1 ord', 'hierarchical', '2-mo', 'scalar-pf', 'mab', 'lr-gbr-brr-mock',
+         ['1 nom 1 float 1 nom 1 int 1 ord', 'hierarchical', '2-mo', 'scalar-pf', 'mab', 'lr-gbr-brr-gpr',
          'surr.vt', 'surr.ct', 'optimizer.random', 'opt.vt.none', 'opt.ct.none',
          'validator.mock-q', 'validator.internal.none-y', 'cs.best', 'ted.none',
          'mr.none', 'mtl.none', 'sc.time', 'rm.quality', 'dch.none', 'ss.sobol']

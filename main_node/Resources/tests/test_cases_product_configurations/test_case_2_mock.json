@@ -135,26 +135,21 @@
                     "Instance": {
                         "RandomSearch": {
                             "SamplingSize": 10,
+                            "MultiObjective": true,
                             "Type": "random_search"
                         }
                     }
                 },
                 "Validator": {
                     "ExternalValidator": {
-                        "QualityValidator": {
-                            "Split": {
-                                "HoldOut": {
-                                    "TrainingSet": 0.7
-                                }
-                            },
-                            "QualityThreshold": 0.0,
-                            "Type": "quality_validator"
+                        "MockValidator": {
+                            "Type": "mock_validator"
                         }
                     }
                 },
                 "CandidateSelector": {
                     "RandomMultiPointProposal": {
-                        "NumberOfPoints": 5,
+                        "NumberOfPoints": 1,
                         "Type": "random_multi_point"
                     }
                 }
@@ -177,26 +172,21 @@
                     "Instance": {
                         "RandomSearch": {
                             "SamplingSize": 10,
+                            "MultiObjective": true,
                             "Type": "random_search"
                         }
                     }
                 },
                 "Validator": {
                     "ExternalValidator": {
-                        "QualityValidator": {
-                            "Split": {
-                                "HoldOut": {
-                                    "TrainingSet": 0.65
-                                }
-                            },
-                            "QualityThreshold": 0.3,
-                            "Type": "quality_validator"
+                        "MockValidator": {
+                            "Type": "mock_validator"
                         }
                     }
                 },
                 "CandidateSelector": {
                     "RandomMultiPointProposal": {
-                        "NumberOfPoints": 5,
+                        "NumberOfPoints": 1,
                         "Type": "random_multi_point"
                     }
                 }
@@ -230,14 +220,14 @@
             }
         }
     },
-    "DefaultConfigurationHandler": {
-        "RandomDCH": {
-            "Type": "random_default_config_handler"
-        }
-    },
     "DistributionMode": {
         "AsynchronousDistribution": {
             "Type": "asynchronous_distribution"
+        }
+    },
+    "DefaultConfigurationHandler": {
+        "RandomDCH": {
+            "Type": "random_default_config_handler"
         }
     }
 }

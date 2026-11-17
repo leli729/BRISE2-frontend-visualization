@@ -78,7 +78,7 @@ The model validation strategy decides whether to use model-based configuration s
 * `Energy Validator`. This is a custom validation strategy, developed for an empirical study on software energy-efficiency. 
 * `Quality Validator` is a generic validation strategy. The main metric of this strategy is the coefficient of determination R^2.
 `Quality Validator` can be run in two sub-variants: one-staged or two staged. For details of each variant consult the following publication [1].
-* `Mock Validator` can be utilized to disable validation.
+* `Mock Validator` can be utilized to disable validation. It is the only external validator allowed with a surrogate that predicts no objective.
 
 [1] Pukhkaiev, D., Husak, O., Götz, S., Aßmann, U. (2021). Multi-objective Parameter Tuning with Dynamic Compositional Surrogate Models. In: Simos, D.E., Pardalos, P.M., Kotsireas, I.S. (eds) Learning and Intelligent Optimization. LION 2021. Lecture Notes in Computer Science(), vol 12931. Springer, Cham. https://doi.org/10.1007/978-3-030-92121-7_26
 

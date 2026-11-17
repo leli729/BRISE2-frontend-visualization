@@ -81,9 +81,11 @@
                     "Instance": {
                         "MOEA": {
                             "Generations": 10,
-                            "PopulationSize": 100,
+                            "PopulationSize": 126,
                             "Algorithms": {
-                                "MOEAD": {}
+                                "MOEAD": {
+                                    "MultiObjective": true
+                                }
                             },
                             "Type": "moea"
                         }
@@ -120,10 +122,22 @@
                     }
                 },
                 "Surrogate_0": {
+                    "ConfigurationTransformers": {
+                        "NominalTransformer": {
+                            "BinaryEncoder": {
+                                "Type": "binary_transformer",
+                                "Class": "brise.BinaryEncoder"
+                            }
+                        }
+                    },
                     "Instance": {
-                        "ModelMock": {
+                        "GaussianProcessRegressor": {
                             "MultiObjective": true,
-                            "Type": "model_mock"
+                            "Parameters": {
+                                "n_restarts_optimizer": 10
+                            },
+                            "Type": "sklearn_model_wrapper",
+                            "Class": "sklearn.gaussian_process.GaussianProcessRegressor"
                         }
                     }
                 },
@@ -140,7 +154,9 @@
                         "MultiLayerPerceptronRegressor": {
                             "MultiObjective": false,
                             "Parameters": {
-                                "hidden_layer_sizes": 10,
+                                "hidden_layer_sizes": [
+                                    10
+                                ],
                                 "activation": "tanh",
                                 "solver": "sgd",
                                 "alpha": 0.0001
