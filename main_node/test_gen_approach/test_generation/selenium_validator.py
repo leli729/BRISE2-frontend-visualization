@@ -124,6 +124,7 @@ CONTEXT_REQUIRED_TRANSFORMERS: Dict[str, List[str]] = {
     "2-float":    [],
     "float-nom":  ["NominalTransformer"],
     "all-types":  ["NominalTransformer", "OrdinalTransformer"],
+    "int-cat":    ["NominalTransformer", "OrdinalTransformer"],
 }
 
 CONTEXT_SEARCH_SPACE_BOUNDS: Dict[str, Dict[str, Any]] = {

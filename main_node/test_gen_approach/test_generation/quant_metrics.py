@@ -15,6 +15,7 @@ from collections import Counter
 from itertools import combinations
 from pathlib import Path
 
+from dimension_blacklist import feature_dimensions
 from wfl_parser_textx import WflParserTextX
 from pairwise_generator import generate_pairwise
 
@@ -53,9 +54,9 @@ def _all_keys(obj) -> set:
 
 
 def get_parser_features(grammar_path: str, wfl_path: str) -> list:
-    # Return all feature value lists from the WFL parser (one list per dimension
+    # Return the dimensions the generator samples (one list per dimension): the parser's, minus the blacklist
     parser = WflParserTextX(grammar_path, wfl_path)
-    return parser.parse_features()
+    return feature_dimensions(parser)
 
 
 def covered_by_pairwise(all_values: set, configs) -> set:

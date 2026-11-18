@@ -11,7 +11,7 @@ Workflow:
     4. Output a list of PairwiseConfig objects ready for Waffle API validation
 
 Context variants encode the test SearchSpace + Objective combinations:
-    - SearchSpace: 2-float or float-nom or all-types
+    - SearchSpace: 2-float, float-nom, all-types (single objective only: int-cat)
     - Objectives : so (single objective) or 2-mo or 5-mo
 
 Usage:
@@ -30,6 +30,7 @@ from typing import List, Dict, Any
 
 from allpairspy import AllPairs
 
+from dimension_blacklist import feature_dimensions
 from wfl_parser_textx import WflParserTextX
 
 
@@ -45,6 +46,7 @@ CONTEXT_VARIANTS: List[str] = [
     "all-types-so",
     "all-types-2-mo",
     "all-types-5-mo",
+    "int-cat-so",
 ]
 
 
@@ -70,6 +72,14 @@ class PairwiseConfig:
                 return s
         return None
 
+    def get_enum(self, attribute: str) -> str | None:
+        """Return the value selected for an enum attribute, None if there is no dimension for it."""
+        prefix = f"enum.{attribute}="
+        for s in self.selections:
+            if s.startswith(prefix):
+                return s[len(prefix):]
+        return None
+
     def __repr__(self) -> str:
         active = [s for s in self.selections if not s.endswith(".None")]
         return (
@@ -85,9 +95,9 @@ def generate_pairwise(
     wfl_path: str,
     context_variants: List[str] = CONTEXT_VARIANTS,
 ) -> List[PairwiseConfig]:
-    # Step 1 parse feature model
+    # Step 1 parse feature model, without the blacklisted features
     parser = WflParserTextX(grammar_path, wfl_path)
-    feature_dims: List[List[str]] = parser.parse_features()
+    feature_dims: List[List[str]] = feature_dimensions(parser)
 
     # Step 2 append context variant dimension
     all_dims = feature_dims + [context_variants]
@@ -144,7 +154,7 @@ if __name__ == "__main__":
     wfl_path = sys.argv[2]
 
     parser = WflParserTextX(grammar_path, wfl_path)
-    feature_dims = parser.parse_features()
+    feature_dims = feature_dimensions(parser)
 
     configs = generate_pairwise(grammar_path, wfl_path)
 

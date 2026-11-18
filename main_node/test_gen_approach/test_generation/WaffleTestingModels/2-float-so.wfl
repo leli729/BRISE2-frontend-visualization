@@ -77,7 +77,7 @@ Context {
       Y1 : Objective {
         [Name = "Y1"]
         [DataType = "float"]
-        [Minimization = true]
+        [Minimization = false]
         [MinExpectedValue = 0]
         [MaxExpectedValue = 100]
       }

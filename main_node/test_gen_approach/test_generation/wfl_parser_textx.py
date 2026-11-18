@@ -112,8 +112,8 @@ class WflParserTextX:
             
             elif gcard == 'or':
                 # or: one or more can be selected
-                # Each child becomes an optional dimension
-                for child_name in children:
+                # Each child becomes an optional dimension, a child that is a group itself too
+                for child_name in self._get_direct_children(feature, include_groups=True):
                     child_path = f"{full_path}.{child_name}"
                     self._features_cache.append([child_path, f"{child_path}.None"])
         
@@ -141,8 +141,8 @@ class WflParserTextX:
                         if self._get_class_name(child) == 'Feature':
                             self._traverse_feature(child, parent_path)
     
-    def _get_direct_children(self, feature) -> List[str]:
-        #Get names of direct children features
+    def _get_direct_children(self, feature, include_groups: bool = False) -> List[str]:
+        # Get names of direct children features; a child that is an xor/or group is an option only if include_groups
         children = []
         if feature.nested:
             for nested in feature.nested:
@@ -150,7 +150,7 @@ class WflParserTextX:
                     for child in nested.child:
                         if self._get_class_name(child) == 'Feature':
                             # Skip nested xor/or groups, they are groups, not options
-                            if child.gcard not in ['xor', 'or']:
+                            if include_groups or child.gcard not in ['xor', 'or']:
                                 children.append(child.name)
         return children
     
@@ -238,11 +238,23 @@ class WflParserTextX:
             values_str = match.group(2)
             values = re.findall(r'"([^"]+)"', values_str)
             if values:
+                if result.get(attr_name, values) != values:
+                    raise ValueError(f"Enum attribute {attr_name} is declared with different values: "
+                                     f"{result[attr_name]} and {values}")
                 result[attr_name] = values
         
         self._enums_cache = result
         return result
     
+    def parse_enum_dimensions(self) -> List[List[str]]:
+        """
+        One pairwise dimension per enum attribute (an attribute declared several times is one dimension).
+
+        Returns:
+            List of dimensions; the options are "enum.<attribute>=<value>".
+        """
+        return [[f"enum.{name}={value}" for value in values] for name, values in self.parse_enums().items()]
+
     def get_all_parsed_data(self) -> Dict[str, Any]:
         return {
             "features": self.parse_features(),
