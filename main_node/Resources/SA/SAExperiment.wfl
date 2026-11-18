@@ -120,12 +120,6 @@ Context {
     }
     [if size childs.self.Objectives > 1 then fcard.ConfigurationSelection.Predictor.Model.MultiObjectiveHandling = 1 else fcard.ConfigurationSelection.Predictor.Model.MultiObjectiveHandling = 0]
     [if size childs.self.Objectives < 2 then fcard.PlotSelection.Plot.ParetoFront = 0]
-    // one objective: no multi-objective algorithm
-    [if size childs.self.Objectives < 2 then self excludes ConfigurationSelection.Predictor.Model.Optimizer.Instance.MOEA.Algorithms.MOEAD]
-    [if size childs.self.Objectives < 2 then self excludes ConfigurationSelection.Predictor.Model.Optimizer.Instance.MOEA.Algorithms.NSGA2]
-    [if size childs.self.Objectives < 2 then self excludes ConfigurationSelection.Predictor.Model.Optimizer.Instance.MOEA.Algorithms.MACO]
-    [if size childs.self.Objectives < 2 then self excludes ConfigurationSelection.Predictor.Model.Optimizer.Instance.MOEA.Algorithms.MOEAD_GEN]
-    [if size childs.self.Objectives < 2 then self excludes ConfigurationSelection.Predictor.Model.Optimizer.Instance.MOEA.Algorithms.NSPSO]
   }
 
   SearchSpace {
@@ -637,15 +631,19 @@ ConfigurationSelection {
             [Generations > 0]
             PopulationSize -> integer
             [PopulationSize > 0]
+            // a multi-objective algorithm needs more than one objective; the rule is inside the algorithm because a
+            // context rule is evaluated before the algorithm is chosen and then fails in every single-objective model
             or Algorithms {
               MOEAD { //
                 MultiObjective -> predefined
                 [MultiObjective = True]
+                [size childs.Context.TaskConfiguration.Objectives > 1]
                 [parent.parent.PopulationSize in {35, 70, 126, 210, 330, 495, 715, 1001}]
               }
               NSGA2 { //
                 MultiObjective -> predefined
                 [MultiObjective = True]
+                [size childs.Context.TaskConfiguration.Objectives > 1]
                 [parent.parent.PopulationSize >= 5]
                 [parent.parent.PopulationSize % 4 == 0]
               }
@@ -657,6 +655,7 @@ ConfigurationSelection {
               MACO { // Multi-objective Ant Colony Optimizer
                 MultiObjective -> predefined
                 [MultiObjective = True]
+                [size childs.Context.TaskConfiguration.Objectives > 1]
                 [parent.parent.PopulationSize >= 63]
               }
               GWO { // Grey Wolf Optimizer
@@ -700,6 +699,7 @@ ConfigurationSelection {
               MOEAD_GEN { // Multi Objective Evolutionary Algorithms by Decomposition (the DE variant)
                 MultiObjective -> predefined
                 [MultiObjective = True]
+                [size childs.Context.TaskConfiguration.Objectives > 1]
                 [parent.parent.PopulationSize in {35, 70, 126, 210, 330, 495, 715, 1001}]
               }
               PSO { // Particle Swarm Optimization
@@ -715,6 +715,7 @@ ConfigurationSelection {
               NSPSO { // Non dominated Sorting Particle Swarm Optimization
                 MultiObjective -> predefined
                 [MultiObjective = True]
+                [size childs.Context.TaskConfiguration.Objectives > 1]
                 [parent.parent.PopulationSize >= 2]
               }
             }
