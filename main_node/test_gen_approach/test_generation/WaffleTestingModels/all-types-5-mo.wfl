@@ -118,6 +118,12 @@ Context {
     }
     [if size childs.self.Objectives > 1 then fcard.ConfigurationSelection.Predictor.Model.MultiObjectiveHandling = 1 else fcard.ConfigurationSelection.Predictor.Model.MultiObjectiveHandling = 0]
     [if size childs.self.Objectives < 2 then fcard.PlotSelection.Plot.ParetoFront = 0]
+    // one objective: no multi-objective algorithm
+    [if size childs.self.Objectives < 2 then self excludes ConfigurationSelection.Predictor.Model.Optimizer.Instance.MOEA.Algorithms.MOEAD]
+    [if size childs.self.Objectives < 2 then self excludes ConfigurationSelection.Predictor.Model.Optimizer.Instance.MOEA.Algorithms.NSGA2]
+    [if size childs.self.Objectives < 2 then self excludes ConfigurationSelection.Predictor.Model.Optimizer.Instance.MOEA.Algorithms.MACO]
+    [if size childs.self.Objectives < 2 then self excludes ConfigurationSelection.Predictor.Model.Optimizer.Instance.MOEA.Algorithms.MOEAD_GEN]
+    [if size childs.self.Objectives < 2 then self excludes ConfigurationSelection.Predictor.Model.Optimizer.Instance.MOEA.Algorithms.NSPSO]
   }
 
   SearchSpace {
@@ -212,17 +218,18 @@ ConfigurationSelection {
             [fcard.parent.parent.parent.Surrogate = 1]
             [fcard.parent.parent.parent.Optimizer = 1]
             [fcard.parent.parent.parent.Validator.InternalValidator = 0]
-            [self excludes parent.parent.parent.Optimizer.Instance.MOEA.Algorithms.GACO]
-            [self excludes parent.parent.parent.Optimizer.Instance.MOEA.Algorithms.GWO]
-            [self excludes parent.parent.parent.Optimizer.Instance.MOEA.Algorithms.BEE_COLONY]
-            [self excludes parent.parent.parent.Optimizer.Instance.MOEA.Algorithms.DE]
-            [self excludes parent.parent.parent.Optimizer.Instance.MOEA.Algorithms.SEA]
-            [self excludes parent.parent.parent.Optimizer.Instance.MOEA.Algorithms.SGA]
-            [self excludes parent.parent.parent.Optimizer.Instance.MOEA.Algorithms.SADE]
-            [self excludes parent.parent.parent.Optimizer.Instance.MOEA.Algorithms.DE1220]
-            [self excludes parent.parent.parent.Optimizer.Instance.MOEA.Algorithms.CMAES]
-            [self excludes parent.parent.parent.Optimizer.Instance.MOEA.Algorithms.PSO]
-            [self excludes parent.parent.parent.Optimizer.Instance.MOEA.Algorithms.PSO_GEN]
+            // Single-objective algorithms rank one criterion: only with an optimizer scalarizer (no ValueTransformers: all objectives)
+            [if fcard.parent.parent.parent.Optimizer.ValueTransformers == 0 then self excludes parent.parent.parent.Optimizer.Instance.MOEA.Algorithms.GACO]
+            [if fcard.parent.parent.parent.Optimizer.ValueTransformers == 0 then self excludes parent.parent.parent.Optimizer.Instance.MOEA.Algorithms.GWO]
+            [if fcard.parent.parent.parent.Optimizer.ValueTransformers == 0 then self excludes parent.parent.parent.Optimizer.Instance.MOEA.Algorithms.BEE_COLONY]
+            [if fcard.parent.parent.parent.Optimizer.ValueTransformers == 0 then self excludes parent.parent.parent.Optimizer.Instance.MOEA.Algorithms.DE]
+            [if fcard.parent.parent.parent.Optimizer.ValueTransformers == 0 then self excludes parent.parent.parent.Optimizer.Instance.MOEA.Algorithms.SEA]
+            [if fcard.parent.parent.parent.Optimizer.ValueTransformers == 0 then self excludes parent.parent.parent.Optimizer.Instance.MOEA.Algorithms.SGA]
+            [if fcard.parent.parent.parent.Optimizer.ValueTransformers == 0 then self excludes parent.parent.parent.Optimizer.Instance.MOEA.Algorithms.SADE]
+            [if fcard.parent.parent.parent.Optimizer.ValueTransformers == 0 then self excludes parent.parent.parent.Optimizer.Instance.MOEA.Algorithms.DE1220]
+            [if fcard.parent.parent.parent.Optimizer.ValueTransformers == 0 then self excludes parent.parent.parent.Optimizer.Instance.MOEA.Algorithms.CMAES]
+            [if fcard.parent.parent.parent.Optimizer.ValueTransformers == 0 then self excludes parent.parent.parent.Optimizer.Instance.MOEA.Algorithms.PSO]
+            [if fcard.parent.parent.parent.Optimizer.ValueTransformers == 0 then self excludes parent.parent.parent.Optimizer.Instance.MOEA.Algorithms.PSO_GEN]
           }
           Compositional {
             [fcard.parent.parent.parent.Surrogate = size childs.Context.TaskConfiguration.Objectives]
@@ -230,12 +237,29 @@ ConfigurationSelection {
             [self excludes parent.parent.parent.Surrogate.ValueTransformers.ValueScalarizator]
             [self excludes parent.parent.parent.Optimizer.ValueTransformers.ValueScalarizator]
             [fcard.parent.parent.parent.Validator.InternalValidator = 0]
+            // every optimizer ranks one objective: no multi-objective algorithm
+            [self excludes parent.parent.parent.Optimizer.Instance.MOEA.Algorithms.MOEAD]
+            [self excludes parent.parent.parent.Optimizer.Instance.MOEA.Algorithms.NSGA2]
+            [self excludes parent.parent.parent.Optimizer.Instance.MOEA.Algorithms.MACO]
+            [self excludes parent.parent.parent.Optimizer.Instance.MOEA.Algorithms.MOEAD_GEN]
+            [self excludes parent.parent.parent.Optimizer.Instance.MOEA.Algorithms.NSPSO]
           }
           DynamicCompositional {
             [self excludes parent.parent.parent.Surrogate.Instance.TreeParzenEstimator]
             [self excludes parent.parent.parent.Surrogate.ValueTransformers.ValueScalarizator]
             [fcard.parent.parent.parent.Optimizer = 1]
             [fcard.parent.parent.parent.Validator.InternalValidator = 1]
+            [if fcard.parent.parent.parent.Optimizer.ValueTransformers == 0 then self excludes parent.parent.parent.Optimizer.Instance.MOEA.Algorithms.GACO]
+            [if fcard.parent.parent.parent.Optimizer.ValueTransformers == 0 then self excludes parent.parent.parent.Optimizer.Instance.MOEA.Algorithms.GWO]
+            [if fcard.parent.parent.parent.Optimizer.ValueTransformers == 0 then self excludes parent.parent.parent.Optimizer.Instance.MOEA.Algorithms.BEE_COLONY]
+            [if fcard.parent.parent.parent.Optimizer.ValueTransformers == 0 then self excludes parent.parent.parent.Optimizer.Instance.MOEA.Algorithms.DE]
+            [if fcard.parent.parent.parent.Optimizer.ValueTransformers == 0 then self excludes parent.parent.parent.Optimizer.Instance.MOEA.Algorithms.SEA]
+            [if fcard.parent.parent.parent.Optimizer.ValueTransformers == 0 then self excludes parent.parent.parent.Optimizer.Instance.MOEA.Algorithms.SGA]
+            [if fcard.parent.parent.parent.Optimizer.ValueTransformers == 0 then self excludes parent.parent.parent.Optimizer.Instance.MOEA.Algorithms.SADE]
+            [if fcard.parent.parent.parent.Optimizer.ValueTransformers == 0 then self excludes parent.parent.parent.Optimizer.Instance.MOEA.Algorithms.DE1220]
+            [if fcard.parent.parent.parent.Optimizer.ValueTransformers == 0 then self excludes parent.parent.parent.Optimizer.Instance.MOEA.Algorithms.CMAES]
+            [if fcard.parent.parent.parent.Optimizer.ValueTransformers == 0 then self excludes parent.parent.parent.Optimizer.Instance.MOEA.Algorithms.PSO]
+            [if fcard.parent.parent.parent.Optimizer.ValueTransformers == 0 then self excludes parent.parent.parent.Optimizer.Instance.MOEA.Algorithms.PSO_GEN]
           }
           Portfolio {
             [self excludes parent.parent.parent.CandidateSelector.BestMultiPointProposal]
@@ -243,6 +267,17 @@ ConfigurationSelection {
             [self excludes parent.parent.parent.Surrogate.Instance.TreeParzenEstimator]
             [fcard.parent.parent.parent.Optimizer = 1]
             [fcard.parent.parent.parent.Validator.InternalValidator = 1]
+            [if fcard.parent.parent.parent.Optimizer.ValueTransformers == 0 then self excludes parent.parent.parent.Optimizer.Instance.MOEA.Algorithms.GACO]
+            [if fcard.parent.parent.parent.Optimizer.ValueTransformers == 0 then self excludes parent.parent.parent.Optimizer.Instance.MOEA.Algorithms.GWO]
+            [if fcard.parent.parent.parent.Optimizer.ValueTransformers == 0 then self excludes parent.parent.parent.Optimizer.Instance.MOEA.Algorithms.BEE_COLONY]
+            [if fcard.parent.parent.parent.Optimizer.ValueTransformers == 0 then self excludes parent.parent.parent.Optimizer.Instance.MOEA.Algorithms.DE]
+            [if fcard.parent.parent.parent.Optimizer.ValueTransformers == 0 then self excludes parent.parent.parent.Optimizer.Instance.MOEA.Algorithms.SEA]
+            [if fcard.parent.parent.parent.Optimizer.ValueTransformers == 0 then self excludes parent.parent.parent.Optimizer.Instance.MOEA.Algorithms.SGA]
+            [if fcard.parent.parent.parent.Optimizer.ValueTransformers == 0 then self excludes parent.parent.parent.Optimizer.Instance.MOEA.Algorithms.SADE]
+            [if fcard.parent.parent.parent.Optimizer.ValueTransformers == 0 then self excludes parent.parent.parent.Optimizer.Instance.MOEA.Algorithms.DE1220]
+            [if fcard.parent.parent.parent.Optimizer.ValueTransformers == 0 then self excludes parent.parent.parent.Optimizer.Instance.MOEA.Algorithms.CMAES]
+            [if fcard.parent.parent.parent.Optimizer.ValueTransformers == 0 then self excludes parent.parent.parent.Optimizer.Instance.MOEA.Algorithms.PSO]
+            [if fcard.parent.parent.parent.Optimizer.ValueTransformers == 0 then self excludes parent.parent.parent.Optimizer.Instance.MOEA.Algorithms.PSO_GEN]
           }
         }
       }
@@ -547,6 +582,12 @@ ConfigurationSelection {
               Type -> predefined
               [Type = "normalized_weighted_sum"]
             }
+            // an optimizer scalarizer makes the optimizer rank one criterion: no multi-objective algorithm
+            [self excludes parent.parent.Instance.MOEA.Algorithms.MOEAD]
+            [self excludes parent.parent.Instance.MOEA.Algorithms.NSGA2]
+            [self excludes parent.parent.Instance.MOEA.Algorithms.MACO]
+            [self excludes parent.parent.Instance.MOEA.Algorithms.MOEAD_GEN]
+            [self excludes parent.parent.Instance.MOEA.Algorithms.NSPSO]
           }
           xor AcquisitionFunction {
             TPE_EI {

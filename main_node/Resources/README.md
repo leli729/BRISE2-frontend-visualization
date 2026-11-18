@@ -73,6 +73,10 @@ It requires its own `Integer Transformer`, `Nominal Transformer` and `Ordinal Tr
 [Supported algorithms](https://esa.github.io/pygmo2/algorithms.html#algorithms-exposed-from-c):
   * Extended Ant Colony Optimization algorithm (gaco), Multi-objective Ant Colony Optimizer (MACO), Grey Wolf Optimizer (gwo), Artificial Bee Colony, Differential Evolution, (N+1)-ES simple evolutionary algorithm, A Simple Genetic Algorithm, Self-adaptive Differential Evolution,Self-adaptive Differential Evolution, pygmo flavour (pDE), Covariance Matrix Evolutionary Strategy,  Multi Objective Evolutionary Algorithms by Decomposition (the DE variant), Particle Swarm Optimization, generational PSO, Non dominated Sorting Particle Swarm Optimization and Non dominated Sorting Genetic Algorithm (NSGA-II).    
 
+ Pygmo rejects a multi-objective algorithm on one criterion and a single-objective algorithm on multiple. The multi-objective ones are MOEAD, MOEAD_GEN, NSGA2, MACO and NSPSO; all others are single-objective.
+  * Single-objective. Under the `Scalar` and `Compositional` multi-objective handling (one optimizer per objective), and when optimizer has a scalarizer of its own.
+  * Multi-objective. Under `Pure`, `Dynamic Compositional` and `Portfolio` without a scalarizer on the optimizer. 
+
 ##### Validator
 The model validation strategy decides whether to use model-based configuration selection or to stick with the sampling plan. Variants:
 * `Energy Validator`. This is a custom validation strategy, developed for an empirical study on software energy-efficiency. 
