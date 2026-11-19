@@ -19,12 +19,18 @@ from tools.restore_db import RestoreDB
 experiment_description_file = "./Resources/tests/test_cases_product_configurations/test_case_0.json"
 rdb = RestoreDB()
 
+TIME_THRESHOLD = 0.5
+FAST = 0.01
+SLOW = 2.0
+OBJECTIVE = {"Y1": {"Name": "Y1", "DataType": "float", "Minimization": True, "MinExpectedValue": 0, "MaxExpectedValue": 100}}
+
+# a source's samples: the first three were sampled, the rest predicted by a model
+SAMPLED = 3
+SAMPLES = 12
+
 
 class TestMR:
-    def test_0(self, get_workers, get_configurations_2_float):
-        """
-        dynamic model recommendation
-        """
+    def test_recommends_the_model_of_a_similar_experiment(self, get_workers, get_configurations_2_float):
         rdb.cleanup()
         rdb.restore()
         experiment, search_space = self.initialize_experiment()
@@ -69,10 +75,7 @@ class TestMR:
         surrogate = list(mapping_region_model[region].mapping_surrogate_objective.keys())[0]
         assert isinstance(surrogate.surrogate_instance, GaussianProcessRegressor)
 
-    def test_1(self, get_workers, get_configurations_2_float):
-        """
-        soft quality constraint
-        """
+    def test_soft_threshold_recommends_a_model_that_builds_too_slowly(self, get_workers, get_configurations_2_float):
         rdb.restore()
 
         soft_constraint_skeleton = {
@@ -151,10 +154,7 @@ class TestMR:
         mapping_region_model = tl.transfer_submodules["Model_transfer"].recommend_best_model(similar_experiments)
         assert mapping_region_model is not None
 
-    def test_2(self, get_workers, get_configurations_2_float):
-        """
-        few shot
-        """
+    def test_few_shot_transfers_the_model_of_a_similar_experiment(self, get_workers, get_configurations_2_float):
         rdb.restore()
 
         few_shot_skeleton = {
@@ -251,3 +251,118 @@ class TestMappingRegionModel:
         for region, model in mapping_region_model.items():
             assert model.model_name == "Model_{}".format(region[0].level)
             assert model.region == region
+
+
+def _model(n_restarts_optimizer: int) -> dict:
+    """The description of the model that predicted a source's configurations; the number of restarts identifies it."""
+    float_scaler = {"FloatTransformer": {"SklearnFloatMinMaxScaler": {"Type": "sklearn_float_transformer",
+                                                                      "Class": "sklearn.MinMaxScaler"}}}
+    return {"Surrogate": {"ConfigurationTransformers": deepcopy(float_scaler),
+                          "Instance": {"GaussianProcessRegressor": {
+                              "MultiObjective": "True",
+                              "Parameters": {"n_restarts_optimizer": n_restarts_optimizer},
+                              "Type": "sklearn_model_wrapper",
+                              "Class": "sklearn.gaussian_process.GaussianProcessRegressor"}}},
+            "Objectives_surrogate": deepcopy(OBJECTIVE),
+            "Optimizer": {"ConfigurationTransformers": deepcopy(float_scaler),
+                          "Instance": {"MOEA": {"Generations": 10, "PopulationSize": 100,
+                                                "Algorithms": {"GACO": {}}, "Type": "moea"}}},
+            "Objectives_optimizer": deepcopy(OBJECTIVE)}
+
+
+def _source(name: str, improvement_per_step: float, time_to_build: float, n_restarts_optimizer: int) -> dict:
+    """A source experiment record: its best result improves by `improvement_per_step` of its start value after
+    each configuration, and the model that predicted from the fourth configuration on built in `time_to_build`."""
+    samples = []
+    for index in range(SAMPLES):
+        if index < SAMPLED:
+            prediction_info = {"0": {"Model": [], "time_to_build": 0}}
+        else:
+            prediction_info = {"0": {"Model": [_model(n_restarts_optimizer)], "time_to_build": time_to_build}}
+        samples.append({"type": 0, "parameters": {}, "results": {"Y1": 1.0}, "prediction_info": prediction_info})
+    curve = [{"Y1": 100.0 * (1 - improvement_per_step * index)} for index in range(SAMPLES)]
+    return {"Exp_unique_ID": name, "Samples": samples, "Current_best_curve": curve, "Models_dumps": []}
+
+
+def _recommendation(threshold_type: str) -> DynamicModelRecommendation:
+    """A recommendation of a target experiment whose database holds the state and the search space it reads."""
+    rdb.cleanup()
+    description, search_space = load_experiment_setup(experiment_description_file)
+    description = deepcopy(description)
+    description["TransferLearning"]["ModelRecommendation"] = {
+        "DynamicModelsRecommendation": {
+            "RecommendationGranularity": {"Infinite": {"Value": np.inf}},
+            "PerformanceMetric": {"AverageRelativeImprovement": {"Type": "average_relative_improvement"}},
+            "Type": "dynamic_model_recommendation",
+            "ThresholdType": threshold_type,
+            "TimeToBuildModelThreshold": TIME_THRESHOLD,
+            "TimeUnit": "seconds",
+        }
+    }
+    experiment = Experiment(description, search_space)
+    experiment.database.write_one_record("Search_space", get_search_space_record(search_space, experiment.unique_id))
+    experiment.send_state_to_db()
+    return DynamicModelRecommendation(experiment.description, experiment.unique_id)
+
+
+def _n_restarts_of_recommended_model(mapping) -> int:
+    assert mapping is not None
+    (model,) = mapping.values()
+    (surrogate,) = model.mapping_surrogate_objective.keys()
+    return surrogate.surrogate_instance.n_restarts_optimizer
+
+
+class TestSoftThreshold:
+
+    def test_recommends_the_best_source_when_every_source_with_a_good_improvement_is_slow(self):
+        recommendation = _recommendation("Soft")
+        sources = [_source("slow", improvement_per_step=0.05, time_to_build=SLOW, n_restarts_optimizer=1)]
+
+        mapping = recommendation.recommend_best_model(sources)
+
+        assert _n_restarts_of_recommended_model(mapping) == 1
+
+    def test_skips_a_slow_source_for_a_fast_one_that_is_still_above_the_average_improvement(self):
+        recommendation = _recommendation("Soft")
+        # improvements of about 0.059, 0.052 and 0.010 a step: the average is 0.040
+        sources = [_source("slow", improvement_per_step=0.05, time_to_build=SLOW, n_restarts_optimizer=1),
+                   _source("fast", improvement_per_step=0.045, time_to_build=FAST, n_restarts_optimizer=2),
+                   _source("poor", improvement_per_step=0.01, time_to_build=FAST, n_restarts_optimizer=3)]
+
+        mapping = recommendation.recommend_best_model(sources)
+
+        assert _n_restarts_of_recommended_model(mapping) == 2
+
+    def test_recommends_the_best_source_when_the_improvement_is_not_good_anywhere(self):
+        recommendation = _recommendation("Soft")
+        sources = [_source("stagnating", improvement_per_step=0.0, time_to_build=SLOW, n_restarts_optimizer=1)]
+
+        mapping = recommendation.recommend_best_model(sources)
+
+        assert _n_restarts_of_recommended_model(mapping) == 1
+
+    def test_recommends_nothing_when_no_source_has_a_metric(self):
+        recommendation = _recommendation("Soft")
+        source = _source("unpredicted", improvement_per_step=0.05, time_to_build=FAST, n_restarts_optimizer=1)
+        for sample in source["Samples"]:
+            sample["prediction_info"] = {"0": {"Model": [], "time_to_build": 0}}
+
+        assert recommendation.recommend_best_model([source]) is None
+
+
+class TestHardThreshold:
+
+    def test_recommends_nothing_when_every_source_is_slow(self):
+        recommendation = _recommendation("Hard")
+        sources = [_source("slow", improvement_per_step=0.05, time_to_build=SLOW, n_restarts_optimizer=1)]
+
+        assert recommendation.recommend_best_model(sources) is None
+
+    def test_recommends_a_fast_source_after_a_slow_one_with_a_better_improvement(self):
+        recommendation = _recommendation("Hard")
+        sources = [_source("slow", improvement_per_step=0.05, time_to_build=SLOW, n_restarts_optimizer=1),
+                   _source("fast", improvement_per_step=0.02, time_to_build=FAST, n_restarts_optimizer=2)]
+
+        mapping = recommendation.recommend_best_model(sources)
+
+        assert _n_restarts_of_recommended_model(mapping) == 2

@@ -135,6 +135,9 @@ class DynamicModelRecommendation(ModelRecommendation):
                                 ({filtered_experiments_by_time[i]['metric']['average_relative_improvement']}), but violates the time threshold \
                                     {self.time_to_build_model_threshold} seconds")
                         i += 1
+            if resulting_best_combination is None and self.threshold_type == "Soft" and len(filtered_experiments_by_time) > 0:
+                # every source with a good improvement builds its models too slowly: rather take the most performant one
+                resulting_best_combination = filtered_experiments_by_time[0]["metric"]["Model_combination"]
             if resulting_best_combination is None:
                 return None
             else:
