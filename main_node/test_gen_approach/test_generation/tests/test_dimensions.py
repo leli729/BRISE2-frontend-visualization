@@ -146,7 +146,7 @@ def test_the_feature_dimensions_leave_out_what_phase_2_does_not_run(parser):
 
     assert not [option for option in options if option.split(".")[0] in ("PlotSelection", "DistributionMode", "RepetitionManager")]
     assert not [option for option in options if option.endswith("EnergyValidator")]
-    assert "enum.kernel=precomputed" not in options
+    assert not {"enum.kernel=precomputed", "enum.GammaType=float", "enum.CType=float"} & options
     assert {"enum.kernel=rbf", "enum.kernel=linear"} <= options
     assert [f"{EXTERNAL_VALIDATOR}.QualityValidator", f"{EXTERNAL_VALIDATOR}.MockValidator"] in feature_dimensions(parser)
 
@@ -156,7 +156,8 @@ def test_the_feature_dimensions_hold_the_on_off_groups_and_the_enums(parser):
 
     for group in ON_OFF_GROUPS:
         assert [group, f"{group}.None"] in dimensions
-    for attribute in ENUM_ATTRIBUTES:
+    # CType keeps one value ("std") after the blacklist, so it is no dimension and the validator uses its preference
+    for attribute in ENUM_ATTRIBUTES - {"CType"}:
         assert any(dimension[0].startswith(f"enum.{attribute}=") for dimension in dimensions)
 
 

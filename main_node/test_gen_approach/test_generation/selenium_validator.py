@@ -48,6 +48,14 @@ OUTPUT_DIR = _HERE / "output_configs"
 LOG_FILE = _HERE / "invalid_configs.log"
 WAFFLE_URL = "http://127.0.0.1:8000/wizard/initialize/"
 
+# Speed. Every wizard step is a form post answered with a page of several MB, whose JavaScript (the dependency graph)
+# takes seconds to run in headless Chrome and blocks every WebDriver command meanwhile: about 3.5 s a step, 12 minutes a
+# walk. The forms are server-rendered, so the page runs without JavaScript (about 0.5 s a step).
+PAGE_LOAD_STRATEGY = "eager"    # a step is done at DOMContentLoaded, not after the whole page has loaded
+WAIT_POLL_SECONDS = 0.05        # how often a wait checks its condition
+SETTLE_SECONDS = 0.0            # pause after a step before reading its form
+EXTRA_BROWSER_PREFS: Dict[str, Any] = {"profile.managed_default_content_settings.javascript": 2}
+
 
 # Artificial upper caps for attributes that have only a lower bound in the WFL
 # These are the values entered into number fields
@@ -131,6 +139,30 @@ CONTEXT_SEARCH_SPACE_BOUNDS: Dict[str, Dict[str, Any]] = {
     "float-nom": {"Lower": -100.5, "Upper": 457.98, "Default": -7.0},
 }
 
+MODEL_PATH = "ConfigurationSelection.Predictor.Model"
+
+# The or groups every surrogate and every optimizer has; an on/off dimension per child decides what is checked
+# (the surrogate's and the optimizer's groups differ in their rules, so they are never matched by segment).
+OWNER_GROUPS: List[str] = ["ConfigurationTransformers", "ValueTransformers"]
+CONFIGURATION_TRANSFORMERS: List[str] = [
+    "OrdinalTransformer", "NominalTransformer", "IntegerTransformer", "FloatTransformer",
+]
+
+# The stop conditions the wizard can answer (FewShotLearningBasedSC is declared apart, see _needs_few_shot_stop_condition)
+STOP_CONDITIONS: List[str] = [
+    "AdaptiveSC", "BadConfigurationBasedSC", "GuaranteedSC", "ImprovementBasedSC", "QuantityBasedSC", "TimeBasedSC",
+    "ValidationBasedSC",
+]
+
+# MOEA requires these on its optimizer, whatever the search space (WFL: MOEA requires ...ConfigurationTransformers.X)
+MOEA_TRANSFORMERS: set = {"NominalTransformer", "OrdinalTransformer", "IntegerTransformer"}
+
+# TPE requires all four transformers on its surrogate, each with this encoder
+TPE_NOMINAL_ENCODER = "SklearnBinaryEncoder"
+
+# The SurrogateType radios in the order the wizard shows them
+SURROGATE_TYPES: List[str] = ["Scalar", "Pure", "Compositional", "DynamicCompositional", "Portfolio"]
+
 # MOEA algorithms that are single-objective only (MultiObjective = False in WFL).
 # Valid with SurrogateTypes that scalarize/split objectives (Scalar, Compositional,
 # DynamicCompositional) because the optimizer sees nobj=1.
@@ -189,7 +221,8 @@ WFL_CONFLICTS: Dict[str, List[str]] = {
     "SupportVectorRegression": ["Pure"],
     "GradientBoostingRegressor": ["Pure"],
     "BayesianRidgeRegression": ["Pure"],
-    "MultiArmedBandit": ["Pure"],
+    # the bandit also excludes Flat, and (with ModelMock below) the internal validator that Dynamic/Portfolio require
+    "MultiArmedBandit": ["Pure", "Flat", "DynamicCompositional", "Portfolio"],
     "TreeParzenEstimator": ["Pure", "DynamicCompositional", "Portfolio"],
     "MultiLayerPerceptronRegressor": ["Pure"],
 
@@ -201,10 +234,11 @@ WFL_CONFLICTS: Dict[str, List[str]] = {
     # Symmetric rules: skip these SurrogateType options when incompatible features
     # are already selected (prevents wrong fallback choices in xor SurrogateType groups).
     # Portfolio excludes BMP -> skip Portfolio when BMP is selected.
-    "Portfolio": ["BestMultiPointProposal"],
+    "Portfolio": ["BestMultiPointProposal", "TreeParzenEstimator"],
     # Pure excludes most surrogates -> skip Pure when any of those surrogates is selected.
     "Pure": ["LinearRegression", "SupportVectorRegression", "GradientBoostingRegressor",
-             "BayesianRidgeRegression", "MultiArmedBandit", "MultiLayerPerceptronRegressor"],
+             "BayesianRidgeRegression", "MultiArmedBandit", "MultiLayerPerceptronRegressor", "TreeParzenEstimator"],
+    "DynamicCompositional": ["TreeParzenEstimator"],
 
     # MultiArmedBandit excludes all ConfigurationTransformers (BinaryEncoder et al.)
     # When MAB is selected, skip all CT sub-features to avoid the excludes constraint.
@@ -220,6 +254,14 @@ WFL_CONFLICTS: Dict[str, List[str]] = {
     "IntegerTransformer": ["MultiArmedBandit"],
     "FloatTransformer": ["MultiArmedBandit"],
     "MersenneTwister": ["FewShotMultiTask"],
+
+    # FewShotRecommendation excludes the FewShotMultiTask filter
+    "FewShotMultiTask": ["FewShotRecommendation"],
+
+    # ModelMock, the bandit and TPE exclude the Quality (and Energy) external validator: only MockValidator can validate
+    # them, and MockValidator requires no internal validator, which DynamicCompositional and Portfolio require.
+    "QualityValidator": ["ModelMock", "MultiArmedBandit", "TreeParzenEstimator"],
+    "ModelMock": ["DynamicCompositional", "Portfolio"],
 }
 
 # Hardcoded defaults for non-enum free-text fields.
@@ -301,7 +343,7 @@ class WaffleSeleniumValidator:
         """Open a fresh Chrome session, walk the wizard, download if valid"""
         driver = self._make_driver()
         try:
-            wait = WebDriverWait(driver, timeout=30, poll_frequency=0.5)
+            wait = WebDriverWait(driver, timeout=30, poll_frequency=WAIT_POLL_SECONDS)
 
             nextstep_loc = (By.XPATH, "//form//input[@value='Next step']")
             download_loc = (By.XPATH, "//form//input[@value='Download configured product']")
@@ -341,6 +383,10 @@ class WaffleSeleniumValidator:
             # Pre-set MultiObjectiveHandling = 1 so the SurrogateType step IS shown.
             if "-mo" in cfg.context_variant:
                 local_mm["MultiObjectiveHandling"] = {"min": None, "max": 1, "type": "integer"}
+            # and the single-objective ones force it to 0 (WFL: [if size childs.self.Objectives > 1 then ... else
+            # fcard...MultiObjectiveHandling = 0]), whatever the row says
+            if "-so" in cfg.context_variant:
+                local_mm["MultiObjectiveHandling"] = {"min": None, "max": 0, "type": "integer"}
 
             for prefix, bounds in CONTEXT_SEARCH_SPACE_BOUNDS.items():
                 if cfg.context_variant.startswith(prefix):
@@ -402,7 +448,7 @@ class WaffleSeleniumValidator:
                 if "number" in req_types:
                     self._fill_numbers(driver, cfg, local_mm)
                 if "text" in req_types:
-                    self._fill_texts(driver, name_counter)
+                    self._fill_texts(driver, cfg, name_counter)
                 if "radio" in req_types:
                     self._click_radios(driver, cfg)
                 if "checkbox" in req_types:
@@ -473,7 +519,7 @@ class WaffleSeleniumValidator:
                         self._dbg(f"step {step_num}: -> alert: {alert_text}")
 
                 # Small pause to let the DOM finish rendering form inputs
-                time.sleep(0.3)
+                time.sleep(SETTLE_SECONDS)
 
             # Download
             files_before = set(self.output_dir.iterdir())
@@ -482,10 +528,10 @@ class WaffleSeleniumValidator:
             deadline = time.time() + 10
             new_file: Optional[Path] = None
             while time.time() < deadline:
-                time.sleep(0.5)
+                time.sleep(WAIT_POLL_SECONDS)
                 files_after = set(self.output_dir.iterdir())
                 new_files = files_after - files_before
-                done = [f for f in new_files if f.suffix != ".crdownload"]
+                done = [f for f in new_files if f.suffix != ".crdownload" and not f.name.startswith(".")]
                 if done:
                     new_file = done[0]
                     break
@@ -513,7 +559,7 @@ class WaffleSeleniumValidator:
         Example for all-types-so:
           Context.SearchSpace.N0.Level            (4 segments) -> level 0
           Context.SearchSpace.N0.N01.F1.Level     (6 segments) -> level 1
-          Context.SearchSpace.N0.N02.N1.Level     (6 segments) -> level 1
+          Context.SearchSpace.N0.N01.N1.Level     (6 segments) -> level 1
 
         This assumes all Level fields for a given search space appear in the same wizard
         step (Waffle groups them in the SearchSpace Constraint_Group step)
@@ -537,7 +583,6 @@ class WaffleSeleniumValidator:
         # For Hierarchical, assign consecutive integers by nesting depth (0, 1, …)
         is_flat = self._matches_selection("Flat", cfg)
         level_map = {} if is_flat else self._build_level_map(driver)
-        required_transformers = self._get_required_transformers(cfg)
 
         for el in driver.find_elements(By.XPATH, "//form//input[@required=''][@type='number']"):
             raw_name = el.get_attribute("name")
@@ -564,10 +609,6 @@ class WaffleSeleniumValidator:
                     if fcard_min > 0:
                         val = str(fcard_min)
                         self._dbg(f"  fcard_min override: {dotted} min={fcard_min}")
-                # Force ConfigurationTransformers fcard to 1 for both Surrogate and
-                # Optimizer when the context requires NominalTransformer/OrdinalTransformer.
-                if attr == "ConfigurationTransformers" and required_transformers and val == "0":
-                    val = "1"
                 self._dbg(f"  fill_number: {dotted} -> val={val!r}")
 
             el.clear()
@@ -583,7 +624,6 @@ class WaffleSeleniumValidator:
         accidentally activates a conflicting feature (e.g. Portfolio),
         set them to 0 unless cfg.selections indicates they should be enabled
         """
-        required_transformers = self._get_required_transformers(cfg)
         for el in driver.find_elements(
             By.XPATH, "//form//input[@type='number'][not(@required='')]"
         ):
@@ -594,20 +634,14 @@ class WaffleSeleniumValidator:
             attr = _last_segment(dotted)
             feature_path = re.sub(r"\.Model_\d+", ".Model", dotted[len("Fcard."):])
             val = self._get_fill_value(attr, cfg, local_mm, feature_path)
-            # Force ConfigurationTransformers fcard to 1 for both Surrogate and
-            # Optimizer when the context requires NominalTransformer/OrdinalTransformer.
-            # Without this, the Surrogate's CT fcard defaults to 0 and BRISE receives
-            # raw nominal/ordinal strings it cannot convert to float.
-            if attr == "ConfigurationTransformers" and required_transformers and val == "0":
-                val = "1"
             self._dbg(f"  fill_opt_fcard: {dotted} -> val={val!r}")
             el.clear()
             el.send_keys(val)
 
-    def _fill_texts(self, driver, name_counter):
+    def _fill_texts(self, driver, cfg, name_counter):
         for el in driver.find_elements(By.XPATH, "//form//input[@required=''][@type='text']"):
             attr = _last_segment(el.get_attribute("name"))
-            val = self._get_text_value(attr, name_counter)
+            val = self._get_text_value(attr, name_counter, cfg)
             el.clear()
             el.send_keys(val)
 
@@ -626,7 +660,9 @@ class WaffleSeleniumValidator:
         for el in all_radios:
             val = el.get_attribute("value") or ""
             name = el.get_attribute("name") or ""
-            if bool(val) and self._is_conflicting(val, cfg):
+            group = self._group_path(el)
+            owner = self._owner_group(group)
+            if bool(val) and self._is_conflicting(val, cfg, owner):
                 self._dbg(f"  radio: {val!r} skipped (WFL conflict)")
                 continue
             # Check for unconditional replacements (e.g. EnergyValidator → MockValidator)
@@ -643,7 +679,13 @@ class WaffleSeleniumValidator:
                 else:
                     self._dbg(f"  radio: {val!r} skipped (in FEATURE_REPLACEMENTS, not selected)")
                 continue
-            match = bool(val) and self._matches_selection(val, cfg)
+            if owner:
+                match = bool(val) and self._is_chosen_in_owner_group(val, group, owner, cfg)
+            elif group == f"{MODEL_PATH}.Optimizer.Instance":
+                # not by segment: the algorithm selections below MOEA would select MOEA next to RandomSearch
+                match = bool(val) and f"{group}.{val}" in cfg.selections
+            else:
+                match = bool(val) and self._matches_selection(val, cfg)
             self._dbg(f"  radio: name={name!r} val={val!r} -> {'CLICK' if match else 'skip'}")
             if match:
                 el.click()
@@ -660,40 +702,180 @@ class WaffleSeleniumValidator:
                 if name in seen_names:
                     continue
                 val = el.get_attribute("value") or ""
-                if self._is_conflicting(val, cfg) or val in FEATURE_REPLACEMENTS:
+                if self._is_conflicting(val, cfg, self._owner_group(self._group_path(el))) or val in FEATURE_REPLACEMENTS:
                     continue
                 self._dbg(f"  radio fallback: clicking first required radio val={val!r} name={name!r}")
                 el.click()
                 seen_names.add(name)
 
-    def _get_required_transformers(self, cfg) -> set:
+    def _get_required_transformers(self, cfg, owner: str = "Surrogate") -> set:
         """Return transformer checkbox values that MUST be selected for this
-        config's context HP types (e.g. OrdinalTransformer for all-types)."""
+        config's context HP types (e.g. OrdinalTransformer for all-types), and for an
+        optimizer with MOEA the three transformers MOEA always requires."""
+        required: set = set()
         for prefix, transformers in CONTEXT_REQUIRED_TRANSFORMERS.items():
             if cfg.context_variant.startswith(prefix):
-                return set(transformers)
-        return set()
+                required = set(transformers)
+        if owner == "Optimizer" and self._uses_moea(cfg):
+            required |= MOEA_TRANSFORMERS
+        return required
+
+    # Private: surrogate and optimizer groups (D9)
+
+    def _group_path(self, el) -> str:
+        """The path of the group a radio or checkbox belongs to, without the step prefix, 'Gcard.' and instance numbers
+        (Surrogate_2 -> Surrogate)."""
+        raw = el.get_attribute("name") or ""
+        dotted = raw.split("-", 1)[-1] if "-" in raw else raw
+        dotted = re.sub(r"^(Gcard|Fcard)\.", "", dotted)
+        return re.sub(r"_\d+(?=\.|$)", "", dotted)
+
+    def _owner_group(self, group: str) -> Optional[str]:
+        """'Surrogate' or 'Optimizer' for a group inside their transformer groups, else None."""
+        for owner in ("Surrogate", "Optimizer"):
+            prefix = f"{MODEL_PATH}.{owner}."
+            if group.startswith(prefix) and group[len(prefix):].split(".")[0] in OWNER_GROUPS:
+                return owner
+        return None
+
+    def _uses_surrogate(self, name: str, cfg: "PairwiseConfig") -> bool:
+        return f"{MODEL_PATH}.Surrogate.Instance.{name}" in cfg.selections and not self._is_conflicting(name, cfg)
+
+    def _uses_moea(self, cfg: "PairwiseConfig") -> bool:
+        return f"{MODEL_PATH}.Optimizer.Instance.MOEA" in cfg.selections
+
+    def _surrogate_type(self, cfg: "PairwiseConfig") -> Optional[str]:
+        """The SurrogateType the wizard ends up with (None in single-objective contexts, which have none): the row's
+        when it doesn't conflict, else the first that doesn't, as the radio fallback clicks."""
+        if "-so" in cfg.context_variant:
+            return None
+        allowed = [name for name in SURROGATE_TYPES if not self._is_conflicting_by_selection(name, cfg)]
+        for surrogate_type in allowed:
+            if self._matches_selection(surrogate_type, cfg):
+                return surrogate_type
+        return allowed[0] if allowed else None
+
+    def _transformers_on(self, cfg: "PairwiseConfig", owner: str) -> set:
+        """The ConfigurationTransformers checked for the surrogate or the optimizer: the on/off dimensions, the
+        transformers the context, MOEA and TPE require, minus those a conflict (the bandit) forbids."""
+        group = f"{MODEL_PATH}.{owner}.ConfigurationTransformers"
+        on = {name for name in CONFIGURATION_TRANSFORMERS if f"{group}.{name}" in cfg.selections}
+        on |= self._get_required_transformers(cfg, owner)
+        if owner == "Surrogate" and self._uses_surrogate("TreeParzenEstimator", cfg):
+            on |= set(CONFIGURATION_TRANSFORMERS)
+        return {name for name in on if not self._is_conflicting(name, cfg, owner)}
+
+    def _value_transformers_on(self, cfg: "PairwiseConfig", owner: str) -> set:
+        """The ValueTransformers checked for the surrogate or the optimizer.
+
+        A surrogate scalarizer is required by Scalar and excluded by the other surrogate types. An optimizer has an
+        acquisition function exactly with TPE, and a scalarizer only when nothing excludes it: Compositional, a
+        surrogate scalarizer and an acquisition function do."""
+        group = f"{MODEL_PATH}.{owner}.ValueTransformers"
+        scalarizer = f"{group}.ValueScalarizator" in cfg.selections
+        surrogate_type = self._surrogate_type(cfg)
+        if owner == "Surrogate":
+            if surrogate_type == "Scalar":
+                return {"ValueScalarizator"}
+            if surrogate_type is not None:
+                return set()
+            return {"ValueScalarizator"} if scalarizer else set()
+        if self._uses_surrogate("TreeParzenEstimator", cfg):
+            return {"AcquisitionFunction"}
+        if surrogate_type == "Compositional" or self._value_transformers_on(cfg, "Surrogate"):
+            return set()
+        return {"ValueScalarizator"} if scalarizer else set()
+
+    def _children_on(self, cfg: "PairwiseConfig", group: str, owner: str) -> set:
+        if group.endswith(".ConfigurationTransformers"):
+            return self._transformers_on(cfg, owner)
+        return self._value_transformers_on(cfg, owner)
+
+    def _is_chosen_in_owner_group(self, val: str, group: str, owner: str, cfg: "PairwiseConfig") -> bool:
+        """For a radio inside a transformer group: the choice the row made for this owner."""
+        if group.endswith(".AcquisitionFunction"):
+            return self._uses_surrogate("TreeParzenEstimator", cfg)
+        if owner == "Surrogate" and group.endswith(".NominalTransformer") and self._uses_surrogate("TreeParzenEstimator", cfg):
+            return val == TPE_NOMINAL_ENCODER
+        return f"{group}.{val}" in cfg.selections
+
+    def _is_mock_validator_needed(self, cfg: "PairwiseConfig") -> bool:
+        """ModelMock, the bandit and TPE exclude the Quality validator, so MockValidator is the external validator."""
+        return (f"{MODEL_PATH}.Validator.ExternalValidator.MockValidator" in cfg.selections
+                or self._is_conflicting("QualityValidator", cfg))
+
+    def _group_cardinality(self, feature_path: str, cfg: "PairwiseConfig") -> Optional[str]:
+        """The cardinality of a transformer group of a surrogate or an optimizer, and of the internal validator when the
+        mock validator is needed (it requires none); None for every other feature."""
+        path = re.sub(r"_\d+(?=\.|$)", "", feature_path)
+        for owner in ("Surrogate", "Optimizer"):
+            if path == f"{MODEL_PATH}.{owner}.ConfigurationTransformers":
+                return "1" if self._transformers_on(cfg, owner) else "0"
+            if path == f"{MODEL_PATH}.{owner}.ValueTransformers":
+                return "1" if self._value_transformers_on(cfg, owner) else "0"
+        if path == f"{MODEL_PATH}.Validator.InternalValidator" and self._is_mock_validator_needed(cfg):
+            return "0"
+        if path == "StopCondition.Instance.FewShotLearningBasedSC":
+            return "1" if self._needs_few_shot_stop_condition(cfg) else "0"
+        if path == "TransferLearning" and not self._is_transfer_learning_on(cfg):
+            return "0"
+        if path == "StopCondition.Instance.QuantityBasedSC" and not self._has_stop_condition(cfg):
+            return "1"
+        return None
+
+    def _has_stop_condition(self, cfg: "PairwiseConfig") -> bool:
+        """The row leaves at least one stop condition (WFL: [size childs.self > 0] in StopCondition.Instance). A float
+        parameter sets the AdaptiveSC cardinality to 0, so it doesn't count in a context that has one."""
+        counted = [name for name in STOP_CONDITIONS
+                   if not (name == "AdaptiveSC" and not cfg.context_variant.startswith("int-cat"))]
+        return (any(f"StopCondition.Instance.{name}" in cfg.selections for name in counted)
+                or self._needs_few_shot_stop_condition(cfg))
+
+    def _is_transfer_learning_on(self, cfg: "PairwiseConfig") -> bool:
+        """Transfer learning is selected and allowed: with several objectives it excludes both comparators (WFL: the
+        [if size childs.self > 1 and fcard.TransferLearning > 0 then self excludes ...] rules), and it needs a
+        MultiTaskLearning or a ModelRecommendation (WFL: [self.MultiTaskLearning or self.ModelRecommendation])."""
+        if "TransferLearning" not in cfg.selections or "-mo" in cfg.context_variant:
+            return False
+        return not ("TransferLearning.MultiTaskLearning.None" in cfg.selections
+                    and "TransferLearning.ModelRecommendation.None" in cfg.selections)
+
+    def _needs_few_shot_stop_condition(self, cfg: "PairwiseConfig") -> bool:
+        """FewShotRecommendation and the FewShotMultiTask filter require a FewShotLearningBasedSC
+        (WFL: [fcard.StopCondition.Instance.FewShotLearningBasedSC = "+"])."""
+        if not self._is_transfer_learning_on(cfg):
+            return False
+        recommendation = "TransferLearning.ModelRecommendation.FewShotRecommendation" in cfg.selections
+        filter_on = ("TransferLearning.MultiTaskLearning.Filters.FewShotMultiTask" in cfg.selections
+                     and "TransferLearning.MultiTaskLearning.None" not in cfg.selections
+                     and not self._is_conflicting("FewShotMultiTask", cfg))
+        return recommendation or filter_on
 
     def _click_checkboxes(self, driver, cfg):
         # Collect all checkboxes, click any whose value matches a pairwise selection
         # or is a required transformer for this context's HP types
-        required_transformers = self._get_required_transformers(cfg)
         all_cbs = driver.find_elements(By.XPATH, "//form//input[@type='checkbox']")
         clicked_groups: set = set()  # track which name-groups got a click
         for el in all_cbs:
             val = el.get_attribute("value") or ""
             name = el.get_attribute("name") or ""
+            group = self._group_path(el)
+            owner = self._owner_group(group)
+            if owner:
+                # the transformers of a surrogate or an optimizer: the resolved set, not a match by segment
+                match = bool(val) and val in self._children_on(cfg, group, owner)
+                self._dbg(f"  checkbox: name={name!r} val={val!r} -> {'CLICK' if match else 'skip'} ({owner})")
+                if match:
+                    el.click()
+                    clicked_groups.add(name)
+                continue
             if bool(val) and self._is_conflicting(val, cfg):
                 self._dbg(f"  checkbox: {val!r} skipped (WFL conflict)")
                 continue
             if bool(val) and self._is_algorithm_incompatible(val, cfg):
                 continue
-            forced = val in required_transformers
-            match = bool(val) and (self._matches_selection(val, cfg) or forced)
-            tag = ""
-            if forced and not self._matches_selection(val, cfg):
-                tag = " (forced: context requires this transformer)"
-            self._dbg(f"  checkbox: name={name!r} val={val!r} -> {'CLICK' if match else 'skip'}{tag}")
+            match = bool(val) and self._matches_selection(val, cfg)
+            self._dbg(f"  checkbox: name={name!r} val={val!r} -> {'CLICK' if match else 'skip'}")
             if match:
                 el.click()
                 clicked_groups.add(name)
@@ -757,31 +939,47 @@ class WaffleSeleniumValidator:
         """
         is_so_context = "-so" in cfg.context_variant
         is_mo_context = "-mo" in cfg.context_variant
-        uses_mo_surrogate = any(
-            self._matches_selection(st, cfg) for st in MO_SURROGATE_TYPES
-        )
-        uses_so_surrogate = any(
-            self._matches_selection(st, cfg) for st in SO_SURROGATE_TYPES
-        )
+        # the type the wizard ends up with: the algorithms are asked first, and the radio fallback replaces a type
+        # that conflicts with the row's surrogate
+        surrogate_type = self._surrogate_type(cfg)
+        uses_mo_surrogate = surrogate_type in MO_SURROGATE_TYPES
+        uses_so_surrogate = surrogate_type in SO_SURROGATE_TYPES
+        # an optimizer scalarizer makes the optimizer rank one criterion, whatever the surrogate type
+        has_optimizer_scalarizer = "ValueScalarizator" in self._value_transformers_on(cfg, "Optimizer")
 
-        if val in SINGLE_OBJECTIVE_ALGORITHMS and is_mo_context and uses_mo_surrogate:
-            self._dbg(f"  checkbox: {val!r} skipped (SO algorithm with Pure/Portfolio)")
+        if val in SINGLE_OBJECTIVE_ALGORITHMS and is_mo_context and uses_mo_surrogate and not has_optimizer_scalarizer:
+            self._dbg(f"  checkbox: {val!r} skipped (SO algorithm with Pure/Portfolio and no optimizer scalarizer)")
             return True
-        if val in MULTI_OBJECTIVE_ALGORITHMS and is_mo_context and uses_so_surrogate:
-            self._dbg(f"  checkbox: {val!r} skipped (MO algorithm with Scalar/Compositional/DynamicCompositional)")
+        if val in MULTI_OBJECTIVE_ALGORITHMS and is_mo_context and (uses_so_surrogate or has_optimizer_scalarizer):
+            self._dbg(f"  checkbox: {val!r} skipped (MO algorithm with Scalar/Compositional or an optimizer scalarizer)")
             return True
         if val in MULTI_OBJECTIVE_ALGORITHMS and is_so_context:
             self._dbg(f"  checkbox: {val!r} skipped (MO algorithm in SO context)")
             return True
         return False
 
-    def _is_conflicting(self, val: str, cfg: "PairwiseConfig") -> bool:
+    def _is_conflicting(self, val: str, cfg: "PairwiseConfig", owner: Optional[str] = None) -> bool:
         """Return True if val should be skipped because a conflicting feature is selected.
 
         Uses WFL_CONFLICTS: if any trigger feature for val is present in cfg,
-        selecting val would cause an unavoidable WFL constraint violation
+        selecting val would cause an unavoidable WFL constraint violation.
+        owner: 'Optimizer' for a value inside an optimizer's transformer groups: the bandit empties only the surrogate's.
         """
+        if self._is_conflicting_by_selection(val, cfg, owner):
+            return True
+        # Pure below MultiObjectiveHandling.None is no trigger for the check above, yet the wizard clicks it (a direct
+        # click ignores that parent), so the instances it excludes conflict when Pure is the type the wizard ends up with
+        return val not in SURROGATE_TYPES and "Pure" in WFL_CONFLICTS.get(val, []) and self._surrogate_type(cfg) == "Pure"
+
+    def _is_conflicting_by_selection(self, val: str, cfg: "PairwiseConfig", owner: Optional[str] = None) -> bool:
+        """_is_conflicting by the features the row selects (the types are judged by this, which `_surrogate_type`
+        needs: a bandit and Pure exclude each other)."""
         triggers = WFL_CONFLICTS.get(val)
+        if triggers and owner == "Optimizer":
+            triggers = [trigger for trigger in triggers if trigger != "MultiArmedBandit"]
+        if triggers and "MultiArmedBandit" in triggers and self._is_conflicting_by_selection("MultiArmedBandit", cfg):
+            # a bandit that is skipped itself (Flat, Pure, ...) empties nothing
+            triggers = [trigger for trigger in triggers if trigger != "MultiArmedBandit"]
         if not triggers:
             pass
         elif any(self._matches_selection(t, cfg, check_ancestors=True) for t in triggers):
@@ -842,6 +1040,16 @@ class WaffleSeleniumValidator:
         substring, without it (Value fields), a last-segment endswith check is
         used instead
         """
+        if feature_path is not None:
+            cardinality = self._group_cardinality(feature_path, cfg)
+            if cardinality is not None:
+                return cardinality
+        # MeanShift: Estimated has its own bounds (WFL: [if BandwidthType == "Estimated" then bandwidth == -1] ...)
+        if cfg.get_enum("BandwidthType") == "Estimated":
+            if attr == "bandwidth":
+                return "-1"
+            if attr == "quantile":
+                return "0.5"
         if attr in local_mm:
             if local_mm[attr]["max"] is not None:
                 return str(local_mm[attr]["max"])
@@ -872,14 +1080,26 @@ class WaffleSeleniumValidator:
             return "1"
         return "0"
 
-    def _get_text_value(self, attr: str, name_counter: list) -> str:
-        """Return the string value to enter for a text field."""
+    def _get_text_value(self, attr: str, name_counter: list, cfg: "PairwiseConfig") -> str:
+        """Return the string value to enter for a text field: the value the row selected for an enum attribute (the
+        preferred one when it has no dimension), and the values that depend on it."""
         if attr == "Name":
             val = f"SC{name_counter[0]}"
             name_counter[0] += 1
             return val
         if attr in ENUM_PREFERENCES:
-            return ENUM_PREFERENCES[attr]
+            val = cfg.get_enum(attr) or ENUM_PREFERENCES[attr]
+            # WFL: [if activation == "identity" then solver in {"lbfgs", "adam"}]
+            if attr == "solver" and val == "sgd" and cfg.get_enum("activation") == "identity":
+                return "adam"
+            return val
+        # WFL: gamma equals "scale", "auto" or GammaFloat by GammaType; the bandit's c equals "std" or CFloat by CType
+        if attr == "gamma" and cfg.get_enum("GammaType") == "float":
+            return str(ARTIFICIAL_CAPS["GammaFloat"])
+        if attr == "gamma" and cfg.get_enum("GammaType"):
+            return cfg.get_enum("GammaType")
+        if attr == "c":
+            return str(ARTIFICIAL_CAPS["CFloat"]) if cfg.get_enum("CType") == "float" else "std"
         return TEXT_DEFAULTS.get(attr, "value1")
 
     def _get_fcard_min(self, el) -> int:
@@ -914,7 +1134,7 @@ class WaffleSeleniumValidator:
         return (self.models_dir / f"{context_variant}.wfl").read_text()
 
     def _fix_empty_weights(self, path: Path) -> None:
-        """Replace empty Weights ({}) with a list of 1s matching the objective count.
+        """Replace empty Weights ({}) of a WeightedSum or NormalizedWeightedSum with a list of 1s matching the objective count.
         """
         data = json.loads(path.read_text())
         objectives = data.get("Context", {}).get("TaskConfiguration", {}).get("Objectives", {})
@@ -924,11 +1144,12 @@ class WaffleSeleniumValidator:
 
         def _patch(node):
             if isinstance(node, dict):
-                if "WeightedSum" in node and isinstance(node["WeightedSum"], dict):
-                    ws = node["WeightedSum"]
-                    if "Weights" in ws and ws["Weights"] in ({}, []):
-                        ws["Weights"] = [1] * n_obj
-                        self._dbg(f"  patched Weights -> {ws['Weights']}")
+                for scalarizer in ("WeightedSum", "NormalizedWeightedSum"):
+                    if scalarizer in node and isinstance(node[scalarizer], dict):
+                        ws = node[scalarizer]
+                        if "Weights" in ws and ws["Weights"] in ({}, []):
+                            ws["Weights"] = [1] * n_obj
+                            self._dbg(f"  patched Weights -> {ws['Weights']}")
                 for v in node.values():
                     _patch(v)
 
@@ -938,6 +1159,7 @@ class WaffleSeleniumValidator:
     def _make_driver(self) -> webdriver.Chrome:
         """Create a Chrome WebDriver with download directory configured."""
         options = Options()
+        options.page_load_strategy = PAGE_LOAD_STRATEGY
         options.add_argument("--headless")
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
@@ -945,6 +1167,7 @@ class WaffleSeleniumValidator:
             "download.default_directory": str(self.output_dir.resolve()),
             "download.prompt_for_download": False,
             "download.directory_upgrade": True,
+            **EXTRA_BROWSER_PREFS,
         })
         service = Service(ChromeDriverManager().install())
         return webdriver.Chrome(service=service, options=options)

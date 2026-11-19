@@ -23,6 +23,12 @@ BLACKLIST: Dict[str, str] = {
     "RepetitionManager": "the repeater is not run by Phase 2, which writes results without it",
     "ConfigurationSelection.Predictor.Model.Validator.ExternalValidator.EnergyValidator":
         "needs an energy objective, which no test context has",
+    "enum.GammaType=float":
+        "[if GammaType == \"float\" then self.Parameters.gamma == self.GammaFloat] compares a string with a float: "
+        "Waffle rejects every product (found 2026-11-18, plan 09, P4)",
+    "enum.CType=float":
+        "[if CType == \"float\" then self.Parameters.c == self.CFloat] has the same form as GammaType's: Waffle rejects "
+        "every product (Expression (10.0 == 10.0), found 2026-11-18)",
     "enum.kernel=precomputed":
         "SVR expects a square kernel matrix and BRISE builds none (fit raises ValueError)",
 }
