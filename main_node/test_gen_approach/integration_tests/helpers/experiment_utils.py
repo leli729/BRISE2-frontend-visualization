@@ -64,7 +64,8 @@ def get_parameter_types(experiment: Experiment):
     try:
         search_space_str = json.dumps(experiment.description["Context"]["SearchSpace"])
 
-        if "OrdinaryHyperparameter" in search_space_str:
+        # all_types includes int-cat
+        if "OrdinalHyperparameter" in search_space_str:
             return "all_types"
         elif "NominalHyperparameter" in search_space_str:
             return "float_nom"
