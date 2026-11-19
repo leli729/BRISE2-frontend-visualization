@@ -197,6 +197,9 @@ class TestConfigSelectionLoop:
         assert (
             len(configs) >= min_required_iterations
         ), f"Expected at least {min_required_iterations} configs, got {len(configs)} for: {test_id}"
+        assert any(
+            config.type == Configuration.Type.PREDICTED for config in configs
+        ), f"No configuration was predicted in {len(configs)} iterations for: {test_id}"
 
         print(f"{test_id}: completed {len(configs)} iterations")
 

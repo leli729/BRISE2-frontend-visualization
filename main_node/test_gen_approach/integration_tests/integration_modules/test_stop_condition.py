@@ -20,7 +20,6 @@ from test_gen_approach.integration_tests.helpers.experiment_utils import (
     get_configuration_fixture_name,
     get_objective_count,
     get_parameter_types,
-    instantiate_all_scs,
     load_phase1_config,
     write_experiment_to_db,
 )
@@ -256,7 +255,7 @@ class TestStopConditionPhase1:
 
     @pytest.mark.parametrize("config_file", _phase1_configs)
     def test_sc_instantiation(self, config_file, get_configurations_2_float):
-        """instantiate_all_scs returns at least one SC for every Phase 1 config."""
+        """Every stop condition of a generated configuration is named in its expression and instantiates."""
         reset_database()
 
         exp_desc, search_space = load_phase1_config(config_file)
@@ -273,8 +272,12 @@ class TestStopConditionPhase1:
         )
         experiment.send_state_to_db()
 
-        scs = instantiate_all_scs(experiment)
-        assert len(scs) >= 1, f"No SCs could be instantiated for {config_file}"
+        activated_scs = launch_stop_condition_threads(experiment.unique_id, experiment)
+
+        expression = exp_desc["StopCondition"]["StopConditionTriggerLogic"]["Expression"]
+        assert len(activated_scs) == len(exp_desc["StopCondition"]["Instance"]), (
+            f"Stop conditions ignored by the expression {expression!r} in {config_file}"
+        )
 
     @pytest.mark.parametrize("config_file", _phase1_configs)
     def test_sc_decision_is_boolean(
@@ -304,8 +307,8 @@ class TestStopConditionPhase1:
         cs = create_configuration_selection(experiment)
         _run_cs_iterations(experiment, cs, get_configurations_2_float, get_workers, objective_count)
 
-        scs = instantiate_all_scs(experiment)
-        assert len(scs) >= 1, f"No SCs could be instantiated for {config_file}"
+        scs = launch_stop_condition_threads(experiment.unique_id, experiment)
+        assert len(scs) >= 1, f"No SCs were activated for {config_file}"
 
         for sc in scs:
             sc.is_finish()

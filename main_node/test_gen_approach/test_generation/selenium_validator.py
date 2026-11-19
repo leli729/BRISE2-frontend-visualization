@@ -62,7 +62,7 @@ EXTRA_BROWSER_PREFS: Dict[str, Any] = {"profile.managed_default_content_settings
 
 ARTIFICIAL_CAPS: Dict[str, Any] = {
     # MOEA
-    "Generations": 10,
+    "Generations": 2,   # Phase 2 stays affordable: every configuration reaches its optimizer (plan 09, D17)
     "PopulationSize": 70, # must be in [35,70,126,…] AND >= 63
     # RepetitionManager
     "MaxFailedTasksPerConfiguration": 3,
@@ -277,7 +277,32 @@ TEXT_DEFAULTS: Dict[str, str] = {
 
 
 
-# Module-level helper
+# Module-level helpers
+
+def set_quality_threshold(node) -> None:
+    """Set every QualityThreshold below `node` to -100 (plan 09, D12).
+
+    The parser's maximum is 1.0, and R2 can't exceed 1, so a QualityValidator would reject every model and the
+    configuration would only ever be sampled. -100 is the documented manual fix of the Resources/ test cases."""
+    if isinstance(node, dict):
+        for key, value in node.items():
+            if key == "QualityThreshold":
+                node[key] = -100
+            else:
+                set_quality_threshold(value)
+    elif isinstance(node, list):
+        for value in node:
+            set_quality_threshold(value)
+
+
+def set_stop_condition_expression(product: dict) -> None:
+    """Write the stop-condition expression as the `or` of every instance's name (plan 09, D14), so that the product runs
+    through launch_stop_condition_threads, which ignores a stop condition whose name is not in the expression."""
+    stop_condition = product["StopCondition"]
+    names = [instance["Name"] for instance in stop_condition["Instance"].values()]
+    stop_condition["StopConditionTriggerLogic"]["Expression"] = " or ".join(names)
+
+
 
 def _last_segment(dotted_name: str) -> str:
     """Return the last segment after the final dot
@@ -539,6 +564,7 @@ class WaffleSeleniumValidator:
                 target = self.output_dir / f"config_{cfg.index}_{cfg.context_variant}.json"
                 new_file.rename(target)
                 self._fix_empty_weights(target)
+                self._patch_product(target)
             return True
 
         except Exception as exc:
@@ -1132,6 +1158,13 @@ class WaffleSeleniumValidator:
     def _get_wfl_content(self, context_variant: str) -> str:
         """Read the WFL context file for the given variant"""
         return (self.models_dir / f"{context_variant}.wfl").read_text()
+
+    def _patch_product(self, path: Path) -> None:
+        """The generator's patches of Waffle's output: the quality threshold and the stop-condition expression."""
+        data = json.loads(path.read_text())
+        set_quality_threshold(data)
+        set_stop_condition_expression(data)
+        path.write_text(json.dumps(data, indent=4) + "\n")
 
     def _fix_empty_weights(self, path: Path) -> None:
         """Replace empty Weights ({}) of a WeightedSum or NormalizedWeightedSum with a list of 1s matching the objective count.

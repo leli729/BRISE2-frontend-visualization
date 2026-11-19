@@ -1,13 +1,10 @@
 import json
-import math
 from traceback import print_stack
 from pathlib import Path
-from typing import List
 
 from default_config_handler.default_configuration_handler_orchestrator import (
     DefaultConfigHandlerOrchestrator,
 )
-from tools.reflective_class_import import reflective_class_import
 
 from core_entities.configuration import Configuration
 
@@ -178,49 +175,3 @@ def get_default_configuration(experiment: Experiment):
         print(f"Failed to get default configuration: {e}")
         print_stack()
         return None
-
-
-def instantiate_all_scs(experiment: Experiment) -> List:
-    """Instantiate every SC instance defined in the experiment description.
-
-    Unlike launch_stop_condition_threads, this bypasses the Expression filter
-    so it works for Phase 1 configs where SC Names (SC1–SC7) do not appear as
-    substrings in the Expression ("StopCondition1").
-
-    AdaptiveType is skipped when the search space is infinite (all
-    FloatHyperparameter-only search spaces have size np.inf, which AdaptiveType
-    rejects by calling publish() and never setting self.max_configs).
-
-    Any other SC that fails to instantiate is also silently skipped.
-
-    Returns: list of successfully instantiated SC objects.
-    """
-    scs = []
-    try:
-        sc_desc = experiment.description.get("StopCondition", {})
-
-        # Check search-space size once — needed to guard AdaptiveType.
-        ss_record = experiment.database.get_last_record_by_experiment_id(
-            "Search_space", experiment.unique_id
-        )
-        ss_size = ss_record["Search_space_size"] if ss_record else "Infinity"
-        ss_is_finite = isinstance(ss_size, (int, float)) and math.isfinite(ss_size)
-
-        for sc_config in sc_desc.get("Instance", {}).values():
-            sc_type = sc_config.get("Type", "")
-            if sc_type == "adaptive" and not ss_is_finite:
-                print(f"Skipping AdaptiveType: search space is infinite")
-                continue
-            try:
-                sc_class = reflective_class_import(
-                    class_name=sc_type, folder_path="stop_condition"
-                )
-                sc = sc_class(sc_config, experiment.description, experiment.unique_id)
-                scs.append(sc)
-            except Exception as e:
-                print(f"Skipped SC '{sc_type}': {e}")
-                print_stack()
-    except (KeyError, TypeError, AttributeError) as e:
-        print(f"Failed to read StopCondition config: {e}")
-        print_stack()
-    return scs
