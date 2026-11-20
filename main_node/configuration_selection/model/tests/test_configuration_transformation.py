@@ -237,10 +237,10 @@ class TestInverseTransformationOfAnOptimizersProposals:
             pd.testing.assert_frame_equal(batch.iloc[[i]].reset_index(drop=True), alone)
 
     def test_a_parameter_without_a_transformer_is_returned_as_it_is(self, hierarchical_setup):
-        surrogate, optimizer = hierarchical_setup
+        _, optimizer = hierarchical_setup
         # the transformers learn their columns one parameter at a time, as MOEA does when it builds its bounds; the
         # columns of a parameter without a transformer stay unknown to them
-        optimizer._build_bounds_params_masked(surrogate)
+        optimizer._build_bounds_params_masked()
         proposals = pd.DataFrame([[0.9, 0.9], [0.1, 0.1]], columns=optimizer.params)
 
         transformed_back = optimizer._inverse_transform_configuration(proposals)

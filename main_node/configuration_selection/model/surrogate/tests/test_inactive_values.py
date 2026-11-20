@@ -1,5 +1,3 @@
-import copy
-
 import pandas as pd
 import pytest
 
@@ -125,26 +123,13 @@ class TestBinaryCodeOfAParameterThatCanBeInactive:
 class TestOptimizersKeepTheirDomain:
 
     def test_search_bounds_of_the_optimizer_stay_inside_the_categories(self, flat_setup):
-        surrogate, optimizer, _ = flat_setup
+        _, optimizer, _ = flat_setup
 
-        optimizer._build_bounds_params_masked(surrogate)
+        optimizer._build_bounds_params_masked()
 
         bounds = dict(zip(optimizer.params, zip(*optimizer.bounds)))
         ordinal_column = next(c for c in optimizer.params if c.startswith(O1 + "_"))
         assert bounds[ordinal_column] == (0.0, float(len(O1_CATEGORIES) - 1))
-
-    # TOBEDROPPED
-    def test_optimizer_without_its_own_transformer_does_not_borrow_the_one_of_a_parameter_that_can_be_inactive(
-            self, flat_setup, get_experiment):
-        surrogate, _, region = flat_setup
-        description, _ = get_experiment(13)
-        model = copy.deepcopy(description["ConfigurationSelection"]["Predictor"]["Model"])
-        del model["Optimizer"]["ConfigurationTransformers"]
-        objectives = Objectives.from_description(description["Context"]["TaskConfiguration"]["Objectives"])
-        optimizer = MOEA(model["Optimizer"], region, objectives)
-
-        with pytest.raises(ValueError, match="can be inactive"):
-            optimizer._build_bounds_params_masked(surrogate)
 
 
 class TestParametersActivatedWithinRegion:

@@ -59,7 +59,7 @@ def _setup(model, surrogate_key, optimizer_key, region, objectives) -> Setup:
     labels = pd.DataFrame({name: rng.uniform(0, 1, 60) for name in objectives.names})
     assert surrogate.create(features, labels)
 
-    optimizer._build_bounds_params_masked(surrogate)
+    optimizer._build_bounds_params_masked()
     lower, upper = map(np.array, optimizer.bounds)
     return Setup(optimizer, surrogate, rng.uniform(lower, upper, size=(NUMBER_OF_INDIVIDUALS, len(lower))))
 

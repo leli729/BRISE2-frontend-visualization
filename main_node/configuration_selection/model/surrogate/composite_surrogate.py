@@ -17,8 +17,6 @@ class CompositeSurrogate(Surrogate):
 
         super().__init__(surrogate_description, region, objectives)
         self.multi_objective = True
-        if surrogates:
-            self.mapping_config_transformer_parameter = surrogates[0].mapping_config_transformer_parameter
 
     def output_criteria(self) -> Optional[Tuple[Criterion, ...]]:
         declarations = [s.output_criteria() for s in self.surrogates]
