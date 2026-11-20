@@ -2,7 +2,7 @@
 Blacklist of features and values that get no pairwise dimension.
 
 The parser reads every feature of the model. The features below are not run by Phase 2 (or can't run), so a pair spent
-on them tests nothing. An entry leaves the blacklist when Phase 2's reach grows (see the rework plan).
+on them tests nothing. An entry leaves the blacklist when Phase 2's reach grows.
 
 An entry matches an option equal to it or below it ("entry."). A dimension that loses options keeps the rest, and one
 left with fewer than two options is dropped.
@@ -25,7 +25,7 @@ BLACKLIST: Dict[str, str] = {
         "needs an energy objective, which no test context has",
     "enum.GammaType=float":
         "[if GammaType == \"float\" then self.Parameters.gamma == self.GammaFloat] compares a string with a float: "
-        "Waffle rejects every product (found 2026-11-18, plan 09, P4)",
+        "Waffle rejects every product (found 2026-11-18)",
     "enum.CType=float":
         "[if CType == \"float\" then self.Parameters.c == self.CFloat] has the same form as GammaType's: Waffle rejects "
         "every product (Expression (10.0 == 10.0), found 2026-11-18)",

@@ -62,7 +62,7 @@ EXTRA_BROWSER_PREFS: Dict[str, Any] = {"profile.managed_default_content_settings
 
 ARTIFICIAL_CAPS: Dict[str, Any] = {
     # MOEA
-    "Generations": 2,   # Phase 2 stays affordable: every configuration reaches its optimizer (plan 09, D17)
+    "Generations": 2,   # Phase 2 stays affordable: every configuration reaches its optimizer
     "PopulationSize": 70, # must be in [35,70,126,…] AND >= 63
     # RepetitionManager
     "MaxFailedTasksPerConfiguration": 3,
@@ -280,7 +280,7 @@ TEXT_DEFAULTS: Dict[str, str] = {
 # Module-level helpers
 
 def set_quality_threshold(node) -> None:
-    """Set every QualityThreshold below `node` to -100 (plan 09, D12).
+    """Set every QualityThreshold below `node` to -100.
 
     The parser's maximum is 1.0, and R2 can't exceed 1, so a QualityValidator would reject every model and the
     configuration would only ever be sampled. -100 is the documented manual fix of the Resources/ test cases."""
@@ -295,12 +295,37 @@ def set_quality_threshold(node) -> None:
             set_quality_threshold(value)
 
 
+def set_tpe_parameters(node) -> None:
+    """Set `top_n_percent` to 30 and `random_fraction` to 0.0 on every TreeParzenEstimator below `node`.
+
+    The validator enters the maximum of a bounded attribute, 99 and 1.0: with 1.0 the estimator skips every build, and
+    99% good observations leave too few bad ones, so the model never predicts. 30 and 0.0 are the most common values of
+    the Resources/ test cases, and 0.0 never skips a build."""
+    if isinstance(node, dict):
+        for key, value in node.items():
+            if key == "TreeParzenEstimator":
+                value["Parameters"].update({"top_n_percent": 30, "random_fraction": 0.0})
+            else:
+                set_tpe_parameters(value)
+    elif isinstance(node, list):
+        for value in node:
+            set_tpe_parameters(value)
+
+
 def set_stop_condition_expression(product: dict) -> None:
-    """Write the stop-condition expression as the `or` of every instance's name (plan 09, D14), so that the product runs
+    """Write the stop-condition expression as the `or` of every instance's name, so that the product runs
     through launch_stop_condition_threads, which ignores a stop condition whose name is not in the expression."""
     stop_condition = product["StopCondition"]
     names = [instance["Name"] for instance in stop_condition["Instance"].values()]
     stop_condition["StopConditionTriggerLogic"]["Expression"] = " or ".join(names)
+
+
+def patch_product(product: dict) -> None:
+    """The generator's patches of Waffle's output: the quality threshold, the stop-condition expression and the
+    parameters of the Tree-Parzen Estimator."""
+    set_quality_threshold(product)
+    set_stop_condition_expression(product)
+    set_tpe_parameters(product)
 
 
 
@@ -746,7 +771,7 @@ class WaffleSeleniumValidator:
             required |= MOEA_TRANSFORMERS
         return required
 
-    # Private: surrogate and optimizer groups (D9)
+    # Private: surrogate and optimizer groups
 
     def _group_path(self, el) -> str:
         """The path of the group a radio or checkbox belongs to, without the step prefix, 'Gcard.' and instance numbers
@@ -1160,10 +1185,9 @@ class WaffleSeleniumValidator:
         return (self.models_dir / f"{context_variant}.wfl").read_text()
 
     def _patch_product(self, path: Path) -> None:
-        """The generator's patches of Waffle's output: the quality threshold and the stop-condition expression."""
+        """Apply the generator's patches to the product Waffle wrote."""
         data = json.loads(path.read_text())
-        set_quality_threshold(data)
-        set_stop_condition_expression(data)
+        patch_product(data)
         path.write_text(json.dumps(data, indent=4) + "\n")
 
     def _fix_empty_weights(self, path: Path) -> None:
