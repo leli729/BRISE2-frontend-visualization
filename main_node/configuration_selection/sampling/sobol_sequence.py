@@ -16,7 +16,7 @@ class SobolSequence(SamplingStrategy):
         super().__init__(parameters, region)
         dimensionality = len(region)
         self.seed = parameters["Seed"]
-        self.sampler = Sobol(d=dimensionality, scramble=False, seed=self.seed)
+        self.sampler = Sobol(d=dimensionality, scramble=True, seed=self.seed)
         self.sequence = self.sampler.random_base2(20)  # sample 1kk points
         self.index = 0
 
