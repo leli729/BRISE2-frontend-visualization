@@ -278,14 +278,16 @@ TEXT_DEFAULTS: Dict[str, str] = {
 # Module-level helpers
 
 def set_quality_threshold(node) -> None:
-    """Set every QualityThreshold below `node` to -100.
+    """Set every QualityThreshold below `node` to -1e9.
 
     The parser's maximum is 1.0, and R2 can't exceed 1, so a QualityValidator would reject every model and the
-    configuration would only ever be sampled. -100 is the documented manual fix of the Resources/ test cases."""
+    configuration would only ever be sampled. Mock data gives models far below any usable R2 (hundreds to thousands
+    below zero), and Phase 2 checks that the model path runs, not the model's quality: -1e9 accepts every finite score,
+    while too few test rows and NaN still score -inf."""
     if isinstance(node, dict):
         for key, value in node.items():
             if key == "QualityThreshold":
-                node[key] = -100
+                node[key] = -1e9
             else:
                 set_quality_threshold(value)
     elif isinstance(node, list):

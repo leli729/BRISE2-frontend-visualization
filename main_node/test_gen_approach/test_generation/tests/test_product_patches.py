@@ -30,23 +30,23 @@ def _validators(quality_threshold_by_region):
 
 # the quality threshold
 
-def test_every_quality_threshold_of_every_model_is_set_to_minus_100():
+def test_every_quality_threshold_of_every_model_accepts_every_finite_score():
     product = _validators([1.0, 0.5])
 
     set_quality_threshold(product)
 
     for model in ("Model_0", "Model_1"):
         validator = product["ConfigurationSelection"]["Predictor"][model]["Validator"]
-        assert validator["ExternalValidator"]["QualityValidator"]["QualityThreshold"] == -100
-        assert validator["InternalValidator"]["QualityValidator"]["QualityThreshold"] == -100
+        assert validator["ExternalValidator"]["QualityValidator"]["QualityThreshold"] == -1e9
+        assert validator["InternalValidator"]["QualityValidator"]["QualityThreshold"] == -1e9
 
 
 def test_the_quality_threshold_patch_changes_nothing_else():
     product = _validators([1.0])
     product["StopCondition"] = deepcopy(STOP_CONDITION)
     expected = deepcopy(product)
-    expected["ConfigurationSelection"]["Predictor"]["Model_0"]["Validator"]["ExternalValidator"]["QualityValidator"]["QualityThreshold"] = -100
-    expected["ConfigurationSelection"]["Predictor"]["Model_0"]["Validator"]["InternalValidator"]["QualityValidator"]["QualityThreshold"] = -100
+    expected["ConfigurationSelection"]["Predictor"]["Model_0"]["Validator"]["ExternalValidator"]["QualityValidator"]["QualityThreshold"] = -1e9
+    expected["ConfigurationSelection"]["Predictor"]["Model_0"]["Validator"]["InternalValidator"]["QualityValidator"]["QualityThreshold"] = -1e9
 
     set_quality_threshold(product)
 
@@ -154,6 +154,6 @@ def test_a_product_gets_every_patch_of_the_generator():
     patch_product(product)
 
     model = product["ConfigurationSelection"]["Predictor"]["Model_0"]
-    assert model["Validator"]["ExternalValidator"]["QualityValidator"]["QualityThreshold"] == -100
+    assert model["Validator"]["ExternalValidator"]["QualityValidator"]["QualityThreshold"] == -1e9
     assert product["StopCondition"]["StopConditionTriggerLogic"]["Expression"] == "SC1 or SC2 or SC3"
     assert _tpe_parameters(model["Surrogate"]) == (30, 0.0)
