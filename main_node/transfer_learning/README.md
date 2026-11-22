@@ -24,7 +24,7 @@ General transfer learning process consists of two main stages:
 TransferExpediencyDetermination {
     SamplingLandmarkBased {
       MinNumberOfSamples -> integer
-      [MinNumberOfSamples >= 1]
+      [MinNumberOfSamples >= 2]
       Type -> predefined
       [Type = "sampling_landmark_based"]
       xor Comparator {
@@ -67,6 +67,8 @@ TransferExpediencyDetermination {
 The functionality of the first step is covered by the [transfer_expediency_determination](transfer_expediency_determination) module.
 The only available strategy is a sampling-landmark-based approach, which uses one of two 
 available comparators to define the most similar experiments among all source experiments.
+The first `MinNumberOfSamples` configurations of an experiment (the default one included) are its landmarks. A source experiment
+is considered only if it began with the same landmarks as the target, in any order.
 If every configuration a similar source experiment could offer has already been measured in the target
 experiment, that source is excluded from subsequent similarity searches so a new one can be found.
 

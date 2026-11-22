@@ -887,7 +887,7 @@ TransferLearning ? {
   TransferExpediencyDetermination {
     SamplingLandmarkBased {
       MinNumberOfSamples -> integer
-      [MinNumberOfSamples >= 1]
+      [MinNumberOfSamples >= 2]
       Type -> predefined
       [Type = "sampling_landmark_based"]
       xor Comparator {

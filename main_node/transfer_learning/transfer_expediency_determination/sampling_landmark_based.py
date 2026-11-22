@@ -75,7 +75,19 @@ class SamplingLandmarkBased(TransferExpediencyAnalyser):
                    and exp["Exp_unique_ID"] not in self.banned_experiments, all_source_experiments))
         if len(source_experiments) == 0:
             return source_experiments
-        sorted_similar_experiments = self.comparator.get_similar_experiments(source_experiments)
+        # a source is compared with the target on the landmarks only: the first configurations both measured, in any order
+        records = self.database.get_records_by_experiment_id("Configuration", self.experiment_id)
+        target_landmarks = [record["Parameters"] for record in records[:self.min_number_of_samples]]
+        sources_with_landmarks = []
+        for source_experiment in source_experiments:
+            samples = source_experiment.get("Samples", [])[:self.min_number_of_samples]
+            source_landmarks = [sample["parameters"] for sample in samples]
+            if (all(landmark in source_landmarks for landmark in target_landmarks)
+                    and all(landmark in target_landmarks for landmark in source_landmarks)):
+                reduced_source = dict(source_experiment)
+                reduced_source["Samples"] = samples
+                sources_with_landmarks.append(reduced_source)
+        sorted_similar_experiments = self.comparator.get_similar_experiments(sources_with_landmarks)
 
         similar_experiments = []
         if len(sorted_similar_experiments) > 0:
