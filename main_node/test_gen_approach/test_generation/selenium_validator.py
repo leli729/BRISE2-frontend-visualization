@@ -221,8 +221,6 @@ WFL_CONFLICTS: Dict[str, List[str]] = {
     "SupportVectorRegression": ["Pure"],
     "GradientBoostingRegressor": ["Pure"],
     "BayesianRidgeRegression": ["Pure"],
-    # the bandit also excludes Flat, and (with ModelMock below) the internal validator that Dynamic/Portfolio require
-    "MultiArmedBandit": ["Pure", "Flat", "DynamicCompositional", "Portfolio"],
     "TreeParzenEstimator": ["Pure", "DynamicCompositional", "Portfolio"],
     "MultiLayerPerceptronRegressor": ["Pure"],
 
@@ -1025,6 +1023,10 @@ class WaffleSeleniumValidator:
     def _is_conflicting_by_selection(self, val: str, cfg: "PairwiseConfig", owner: Optional[str] = None) -> bool:
         """_is_conflicting by the features the row selects (the types are judged by this, which `_surrogate_type`
         needs: a bandit and Pure exclude each other)."""
+        if val == "MultiArmedBandit":
+            # every context has a numeric parameter, which the bandit builds no model for, and the validator gives every
+            # Model_N the same surrogate: a product with the bandit never predicts a whole configuration
+            return True
         triggers = WFL_CONFLICTS.get(val)
         if triggers and owner == "Optimizer":
             triggers = [trigger for trigger in triggers if trigger != "MultiArmedBandit"]
