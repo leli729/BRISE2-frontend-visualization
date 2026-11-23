@@ -489,201 +489,68 @@ class BRISEBenchmarkRunner:
 
     @_benchmarkable
     def fill_db(self):
-        self._experiment_timeout = 5 * 60
-        time_based_sc_skeleton = {
-            "StopCondition": {
-                "Instance": {
-                    "TimeBasedSC": {
-                        "Parameters": {
-                            "MaxRunTime": 1,
-                            "TimeUnit": "minutes"
-                        },
-                        "Type": "time_based",
-                        "Name": "t"
-                    }
+        """
+        Runs every product configuration of Resources/tests/db/fill_db once for each default configuration handler and
+        each sampling strategy, to fill the test database. A run samples MinNumberOfSamples configurations before its
+        first prediction, and a later experiment takes it as a source only if its landmarks, the first of them, are the
+        same, which needs the same search space, sampler with its seed and default configuration handler.
+        """
+        # a run stops at the number of configurations that gives its source predictions to transfer after the landmarks, or
+        # at the time that bounds the slow ones (the search spaces of all parameter types take minutes for these); the
+        # client terminates a run that outlasts its timeout, which is longer than the time stop
+        self._experiment_timeout = 6 * 60
+        stop_condition = {
+            "Instance": {
+                "QuantityBasedSC": {
+                    "Parameters": {
+                        "MaxConfigs": 30
+                    },
+                    "Type": "quantity_based",
+                    "Name": "q"
                 },
-                "StopConditionTriggerLogic": {
-                    "Expression": "t",
-                    "InspectionParameters": {
-                        "RepetitionPeriod": 1,
-                        "TimeUnit": "seconds"
-                    }
+                "TimeBasedSC": {
+                    "Parameters": {
+                        "MaxRunTime": 4,
+                        "TimeUnit": "minutes"
+                    },
+                    "Type": "time_based",
+                    "Name": "t"
+                }
+            },
+            "StopConditionTriggerLogic": {
+                "Expression": "q or t",
+                "InspectionParameters": {
+                    "RepetitionPeriod": 1,
+                    "TimeUnit": "seconds"
                 }
             }
         }
-        flat_2float_model_skeleton = {
-            "ConfigurationSelection": {
-                "SamplingStrategy": {
-                    "Sobol": {
-                        "Seed": 1,
-                        "Type": "sobol"
-                    }
-                },
-                "Predictor": {
-                    "WindowSize": 1.0,
-                    "Model": {
-                        "Surrogate": {
-                            "ConfigurationTransformers": {
-                                "FloatTransformer": {
-                                    "SklearnFloatMinMaxScaler": {
-                                        "Type": "sklearn_float_transformer",
-                                        "Class": "sklearn.MinMaxScaler"
-                                    }
-                                }
-                            },
-                            "Instance": {
-                                "GaussianProcessRegressor": {
-                                    "MultiObjective": "True",
-                                    "Parameters": {
-                                        "n_restarts_optimizer": 4
-                                    },
-                                    "Type": "sklearn_model_wrapper",
-                                    "Class": "sklearn.gaussian_process.GaussianProcessRegressor"
-                                }
-                            }
-                        },
-                        "Optimizer": {
-                            "ConfigurationTransformers": {
-                                "FloatTransformer": {
-                                    "SklearnFloatMinMaxScaler": {
-                                        "Type": "sklearn_float_transformer",
-                                        "Class": "sklearn.MinMaxScaler"
-                                    }
-                                }
-                            },
-                            "Instance": {
-                                "MOEA": {
-                                    "Generations": 10,
-                                    "PopulationSize": 100,
-                                    "Algorithms": {
-                                        "GACO": {}
-                                    },
-                                    "Type": "moea"
-                                }
-                            }
-                        },
-                        "Validator": {
-                            "ExternalValidator": {
-                                "MockValidator": {
-                                    "Type": "mock_validator"
-                                }
-                            }
-                        },
-                        "CandidateSelector": {
-                            "BestMultiPointProposal": {
-                                "NumberOfPoints": 1,
-                                "Type": "best_multi_point"
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        flat_float_nom_model_skeleton = {
-            "ConfigurationSelection": {
-                "SamplingStrategy": {
-                    "Sobol": {
-                        "Seed": 1,
-                        "Type": "sobol"
-                    }
-                },
-                "Predictor": {
-                    "WindowSize": 1.0,
-                    "Model": {
-                        "Surrogate": {
-                            "ConfigurationTransformers": {
-                                "NominalTransformer": {
-                                    "SklearnBinaryTransformer": {
-                                        "Type": "sklearn_binary_transformer",
-                                        "Class": "sklearn.OrdinalEncoder"
-                                    }
-                                }
-                            },
-                            "Instance": {
-                                "GaussianProcessRegressor": {
-                                    "MultiObjective": "True",
-                                    "Parameters": {
-                                        "n_restarts_optimizer": 4
-                                    },
-                                    "Type": "sklearn_model_wrapper",
-                                    "Class": "sklearn.gaussian_process.GaussianProcessRegressor"
-                                }
-                            }
-                        },
-                        "Optimizer": {
-                            "ConfigurationTransformers": {
-                                "NominalTransformer": {
-                                    "SklearnBinaryTransformer": {
-                                        "Type": "sklearn_binary_transformer",
-                                        "Class": "sklearn.OrdinalEncoder"
-                                    }
-                                }
-                            },
-                            "Instance": {
-                                "MOEA": {
-                                    "Generations": 10,
-                                    "PopulationSize": 100,
-                                    "Algorithms": {
-                                        "GACO": {}
-                                    },
-                                    "Type": "moea"
-                                }
-                            }
-                        },
-                        "Validator": {
-                            "ExternalValidator": {
-                                "MockValidator": {
-                                    "Type": "mock_validator"
-                                }
-                            }
-                        },
-                        "CandidateSelector": {
-                            "BestMultiPointProposal": {
-                                "NumberOfPoints": 1,
-                                "Type": "best_multi_point"
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        # test case with 2 float parameters
-        self._base_experiment_description, self._base_search_space = \
-            load_experiment_setup("./Resources/tests/test_cases_product_configurations/test_case_0.json")
-        experiment_description = self.base_experiment_description
-        experiment_description.update(deepcopy(time_based_sc_skeleton))
-        experiment_description.update(deepcopy(flat_2float_model_skeleton))
-        self.execute_experiment(experiment_description, number_of_repetitions=1)
+        sampling_strategies = [
+            {"Sobol": {"Seed": 1, "Type": "sobol"}},
+            {"MersenneTwister": {"Seed": 1, "Type": "mersenne_twister"}}
+        ]
+        # no block: the basic handler, which takes the default values of the parameters
+        default_configuration_handlers = [
+            None,
+            {"RandomDCH": {"Type": "random_default_config_handler"}}
+        ]
+        # a batched distribution waits for a wave of BatchSize configurations, which fewer workers cannot fill
+        distribution_mode = {"AsynchronousDistribution": {"Type": "asynchronous_distribution"}}
+        min_number_of_samples = 10
 
-        # test case with float nom parameters
-        self._base_experiment_description, self._base_search_space = \
-            load_experiment_setup("./Resources/tests/test_cases_product_configurations/test_case_4.json")
-        experiment_description = self.base_experiment_description
-        experiment_description.update(deepcopy(time_based_sc_skeleton))
-        experiment_description.update(deepcopy(flat_float_nom_model_skeleton))
-        self.execute_experiment(experiment_description, number_of_repetitions=1)
-
-        # test case with float nom parameters and random DCH
-        self._base_experiment_description, self._base_search_space = \
-            load_experiment_setup("./Resources/tests/test_cases_product_configurations/test_case_9.json")
-        experiment_description = self.base_experiment_description
-        experiment_description.update(deepcopy(time_based_sc_skeleton))
-        experiment_description.update(deepcopy(flat_float_nom_model_skeleton))
-        self.execute_experiment(experiment_description, number_of_repetitions=1)
-
-        # test case with all parameter types and random DCH
-        self._base_experiment_description, self._base_search_space = \
-            load_experiment_setup("./Resources/tests/test_cases_product_configurations/test_case_2.json")
-        experiment_description = self.base_experiment_description
-        experiment_description.update(deepcopy(time_based_sc_skeleton))
-        self.execute_experiment(experiment_description, number_of_repetitions=1)
-
-        # test case with all parameter types
-        self._base_experiment_description, self._base_search_space = \
-            load_experiment_setup("./Resources/tests/test_cases_product_configurations/test_case_2_wo_dch.json")
-        experiment_description = self.base_experiment_description
-        experiment_description.update(deepcopy(time_based_sc_skeleton))
-        self.execute_experiment(experiment_description, number_of_repetitions=1)
+        for path in sorted(glob.glob("./Resources/tests/db/fill_db/*.json")):
+            for default_configuration_handler in default_configuration_handlers:
+                for sampling_strategy in sampling_strategies:
+                    experiment_description, search_space = load_experiment_setup(path)
+                    experiment_description["StopCondition"] = deepcopy(stop_condition)
+                    experiment_description["DistributionMode"] = deepcopy(distribution_mode)
+                    experiment_description["ConfigurationSelection"]["SamplingStrategy"] = deepcopy(sampling_strategy)
+                    experiment_description.pop("DefaultConfigurationHandler", None)
+                    if default_configuration_handler is not None:
+                        experiment_description["DefaultConfigurationHandler"] = deepcopy(default_configuration_handler)
+                    for expediency in experiment_description["TransferLearning"]["TransferExpediencyDetermination"].values():
+                        expediency["MinNumberOfSamples"] = min_number_of_samples
+                    self.execute_experiment(experiment_description, search_space, number_of_repetitions=1)
 
         return self.counter
 

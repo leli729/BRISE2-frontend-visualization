@@ -271,12 +271,13 @@ class TestTransferLearningUnit:
             desc = deepcopy(desc)
             desc.update(deepcopy(skeleton))
         experiment = Experiment(desc, ss)
-        return experiment, ss
-
-    def _write_to_db(self, experiment, search_space):
+        # main-node stores the description when it starts; TED reads the objectives of the target from it
         experiment.database.write_one_record(
             "Experiment_description", experiment.get_experiment_description_record()
         )
+        return experiment, ss
+
+    def _write_search_space_to_db(self, experiment, search_space):
         experiment.database.write_one_record(
             "Search_space", get_search_space_record(search_space, experiment.unique_id)
         )
@@ -312,7 +313,7 @@ class TestTransferLearningUnit:
     ):
         reset_database()
         experiment, search_space = self._load_experiment()
-        self._write_to_db(experiment, search_space)
+        self._write_search_space_to_db(experiment, search_space)
         cs = ConfigurationSelection(experiment)
         tl = TransferLearningOrchestrator(
             experiment_id=experiment.unique_id,
@@ -347,7 +348,7 @@ class TestTransferLearningUnit:
             }
         }
         experiment, search_space = self._load_experiment(skeleton)
-        self._write_to_db(experiment, search_space)
+        self._write_search_space_to_db(experiment, search_space)
         cs = ConfigurationSelection(experiment)
         tl = TransferLearningOrchestrator(
             experiment_id=experiment.unique_id,

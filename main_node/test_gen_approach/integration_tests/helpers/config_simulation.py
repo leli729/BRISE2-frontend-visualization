@@ -94,9 +94,6 @@ def add_configuration_to_experiment(
     try:
         if is_transfer_learning:
             experiment.add_configuration(configuration)
-            experiment.database.write_one_record(
-                "Configuration", configuration.get_configuration_record()
-            )
             experiment.send_state_to_db()
         else:
             experiment.measured_configurations.append(configuration)

@@ -87,6 +87,8 @@ ARTIFICIAL_CAPS: Dict[str, Any] = {
     # Search space parameter bounds.
     # Waffle asks for Lower/Upper/Default when defining hyperparameter ranges
     "Upper": 10,
+    # TaskConfiguration: the model has no bound, and 0 would mean "terminate immediately" once the limit is enforced
+    "MaxTimeToRunTask": 10,
     # General
     "RepetitionPeriod": 5,
     # AcceptableErrorBased RepetitionManager:
@@ -135,9 +137,39 @@ CONTEXT_REQUIRED_TRANSFORMERS: Dict[str, List[str]] = {
     "int-cat":    ["NominalTransformer", "OrdinalTransformer"],
 }
 
-CONTEXT_SEARCH_SPACE_BOUNDS: Dict[str, Dict[str, Any]] = {
-    "float-nom": {"Lower": -100.5, "Upper": 457.98, "Default": -7.0},
+# The search spaces of the sources the fixtures hold (the inputs of fill_db), per context and parameter, so that a
+# transfer-learning product can share its landmarks with a source. Int-cat's integers are large: in a space of 44
+# configurations the model's proposals are mostly evaluated already, and its source would never predict.
+CONTEXT_SEARCH_SPACE_BOUNDS: Dict[str, Dict[str, Dict[str, Any]]] = {
+    "2-float": {
+        "X1": {"Lower": 0.0, "Upper": 1.0, "Default": 0.0},
+        "X2": {"Lower": 0.0, "Upper": 1.0, "Default": 0.5},
+    },
+    "float-nom": {
+        "F": {"Lower": -100.5, "Upper": 457.98, "Default": -7.0},
+    },
+    "all-types": {
+        "F1": {"Lower": 0.0, "Upper": 123.0, "Default": 15.3},
+        "I1": {"Lower": 10, "Upper": 1000, "Default": 100},
+    },
+    "int-cat": {
+        "I1": {"Lower": 0, "Upper": 1000, "Default": 0},
+        "I2": {"Lower": 0, "Upper": 1000, "Default": 0},
+    },
 }
+
+
+def search_space_value(context_variant: str, field: str) -> Optional[str]:
+    """The text to enter in a Lower, Upper or Default field of a search-space parameter (e.g.
+    'Context.SearchSpace.N0.N02.I1.Lower'), or None for any other field and for a parameter the context has no values for."""
+    if not field.startswith("Context.SearchSpace."):
+        return None
+    parameter, attribute = field.split(".")[-2:]
+    for prefix, parameters in CONTEXT_SEARCH_SPACE_BOUNDS.items():
+        if context_variant.startswith(prefix) and parameter in parameters:
+            value = parameters[parameter].get(attribute)
+            return None if value is None else str(value)
+    return None
 
 MODEL_PATH = "ConfigurationSelection.Predictor.Model"
 
@@ -438,12 +470,6 @@ class WaffleSeleniumValidator:
             if "-so" in cfg.context_variant:
                 local_mm["MultiObjectiveHandling"] = {"min": None, "max": 0, "type": "integer"}
 
-            for prefix, bounds in CONTEXT_SEARCH_SPACE_BOUNDS.items():
-                if cfg.context_variant.startswith(prefix):
-                    for attr, val in bounds.items():
-                        local_mm[attr] = {"min": None, "max": val, "type": "float"}
-                    break
-
             name_counter = [1]
             step_num = 0
 
@@ -650,7 +676,9 @@ class WaffleSeleniumValidator:
                 # the .None sentinel approach (prevents false positives from descendants)
                 # Normalize Model_N -> Model so indexed paths match pairwise selections.
                 feature_path = re.sub(r"\.Model_\d+", ".Model", dotted[len("Fcard."):]) if dotted.startswith("Fcard.") else None
-                val = self._get_fill_value(attr, cfg, local_mm, feature_path)
+                val = search_space_value(cfg.context_variant, dotted)
+                if val is None:
+                    val = self._get_fill_value(attr, cfg, local_mm, feature_path)
                 # For Fcard fields, ensure we never send below the wizard-advertised minimum
                 # A '+' cardinality feature (mandatory, min=1) would crash the Waffle server
                 # with an IndexError if we send 0 (2-tuple cardinality error vs 3-tuple

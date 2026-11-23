@@ -6,6 +6,7 @@ import pytest
 from core_entities.configuration import Configuration
 from core_entities.experiment import Experiment
 from core_entities.objectives import Objectives
+from tools.restore_db import RestoreDB
 
 
 class TestDescriptionForClients:
@@ -108,3 +109,41 @@ class TestCurrentBest:
         assert experiment.add_configuration(_measured(experiment, 1, {}))
 
         assert experiment.get_current_solution() is experiment.default_configuration
+
+
+class TestRecordForTransferLearning:
+    """
+    A later experiment takes this one as a source if it has the same landmarks, and optimizing the same search space in
+    another direction gives the same landmarks, so the record holds the objectives the experiment optimized.
+    """
+
+    @pytest.fixture
+    def experiment(self, get_experiment) -> Experiment:
+        RestoreDB().cleanup()
+        description, search_space = get_experiment(0)
+        description["Context"]["TaskConfiguration"]["Objectives"]["Y1"]["Minimization"] = False
+        yield Experiment(description, search_space)
+        RestoreDB().cleanup()
+
+    @staticmethod
+    def _record(experiment: Experiment) -> dict:
+        return experiment.database.get_last_record_by_experiment_id("Transfer_learning_info", experiment.unique_id)
+
+    def test_the_record_holds_the_objectives_of_the_experiment(self, experiment, tmp_path):
+        experiment.dump(str(tmp_path))
+
+        recorded = Objectives.from_description(self._record(experiment)["Objectives"])
+        assert recorded == experiment.objectives
+        assert [objective.minimization for objective in recorded] == [False]
+
+    def test_the_record_the_predictor_started_gets_the_objectives_and_keeps_its_models(self, experiment, tmp_path):
+        # the predictor stores the models of the regions in the record while the experiment runs, so the dump finds it
+        experiment.database.write_one_record("Transfer_learning_info",
+                                             {"Exp_unique_ID": experiment.unique_id, "Models_dumps": [b"model"]})
+
+        experiment.dump(str(tmp_path))
+
+        record = self._record(experiment)
+        assert Objectives.from_description(record["Objectives"]) == experiment.objectives
+        assert record["Models_dumps"] == [b"model"]
+        assert "Samples" in record

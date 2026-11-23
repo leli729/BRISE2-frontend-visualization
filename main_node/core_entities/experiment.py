@@ -359,6 +359,7 @@ class Experiment:
             self.database.write_one_record("Transfer_learning_info",
                                            {"Exp_unique_ID": self.unique_id,
                                             "Scenario": self.description["Context"]["TaskConfiguration"]["Scenario"],
+                                            "Objectives": self.objectives.to_description(),
                                             "Samples": [{"type": config.type, "parameters": config.parameters,
                                                         "results": config.results, "prediction_info": config.prediction_info}
                                                         for config in self.measured_configurations],
@@ -368,6 +369,7 @@ class Experiment:
                 "Transfer_learning_info",
                 {"Exp_unique_ID": self.unique_id},
                 {"Scenario": self.description["Context"]["TaskConfiguration"]["Scenario"],
+                 "Objectives": self.objectives.to_description(),
                  "Samples": [{"type": config.type, "parameters": config.parameters,
                              "results": config.results, "prediction_info": config.prediction_info}
                              for config in self.measured_configurations],

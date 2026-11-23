@@ -3,6 +3,7 @@ from copy import deepcopy
 
 from core_entities.configuration import Configuration
 from core_entities.experiment import Experiment
+from core_entities.objectives import Objectives
 from core_entities.search_space import SearchSpace
 from tools.initial_config import load_experiment_setup
 from tools.restore_db import RestoreDB
@@ -82,7 +83,9 @@ class TestTED:
 
         tl = TransferLearningOrchestrator(experiment_id=experiment.unique_id,
                                           experiment_description=experiment.description)
-        assert len(tl.ted_module.analyse_experiments_similarity()) == 1
+        similar_experiments = tl.ted_module.analyse_experiments_similarity()
+        assert len(similar_experiments) == 1
+        assert Objectives.from_description(similar_experiments[0]["Objectives"]) == experiment.objectives
 
     def test_3(self, get_workers, get_configurations_2_float):
         """similar experiment found"""
@@ -308,4 +311,6 @@ class TestTED:
             modified_description.update(deepcopy(skeleton))
 
         experiment = Experiment(modified_description, search_space)
+        # main-node stores the description when it starts; TED reads the objectives of the target from it
+        experiment.database.write_one_record("Experiment_description", experiment.get_experiment_description_record())
         return experiment, search_space

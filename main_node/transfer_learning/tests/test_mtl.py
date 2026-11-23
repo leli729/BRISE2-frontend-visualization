@@ -276,4 +276,6 @@ class TestMTL:
             modified_description.update(deepcopy(skeleton))
 
         experiment = Experiment(modified_description, search_space)
+        # main-node stores the description when it starts; TED reads the objectives of the target from it
+        experiment.database.write_one_record("Experiment_description", experiment.get_experiment_description_record())
         return experiment, search_space

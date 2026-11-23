@@ -1,5 +1,6 @@
 from typing import List, Union
 
+from core_entities.objectives import Objectives
 from transfer_learning.transfer_expediency_determination.transfer_expediency_analyser import TransferExpediencyAnalyser
 from tools.reflective_class_import import reflective_class_import
 
@@ -57,6 +58,17 @@ class SamplingLandmarkBased(TransferExpediencyAnalyser):
             e for e in self.similar_experiments if e["Exp_unique_ID"] not in self.banned_experiments]
         self.logger.info(f"Source experiments exhausted and banned from further transfer: {newly_banned}")
 
+    def _has_same_objectives_as_target(self, source_experiment: dict, target_objectives: Objectives) -> bool:
+        if "Objectives" not in source_experiment:
+            self.logger.info(f"The objectives of the source experiment {source_experiment['Exp_unique_ID']} are unknown, "
+                             f"it is not taken.")
+            return False
+        if Objectives.from_description(source_experiment["Objectives"]) != target_objectives:
+            self.logger.info(f"The source experiment {source_experiment['Exp_unique_ID']} has other objectives than the "
+                             f"target, it is not taken.")
+            return False
+        return True
+
     def analyse_experiments_similarity(self) -> Union[List, None]:
         if self.database.get_last_record_by_experiment_id("Experiment_state", self.experiment_id) is None:
             return None
@@ -75,11 +87,19 @@ class SamplingLandmarkBased(TransferExpediencyAnalyser):
                    and exp["Exp_unique_ID"] not in self.banned_experiments, all_source_experiments))
         if len(source_experiments) == 0:
             return source_experiments
+        target_description = self.database.get_last_record_by_experiment_id("Experiment_description", self.experiment_id)
+        if target_description is None:
+            self.logger.warning("The objectives of the target experiment are unknown, no source can be taken.")
+            return []
+        target_objectives = Objectives.from_description(target_description["Context"]["TaskConfiguration"]["Objectives"])
         # a source is compared with the target on the landmarks only: the first configurations both measured, in any order
         records = self.database.get_records_by_experiment_id("Configuration", self.experiment_id)
         target_landmarks = [record["Parameters"] for record in records[:self.min_number_of_samples]]
         sources_with_landmarks = []
         for source_experiment in source_experiments:
+            # the landmarks do not tell the direction an experiment optimized in
+            if not self._has_same_objectives_as_target(source_experiment, target_objectives):
+                continue
             samples = source_experiment.get("Samples", [])[:self.min_number_of_samples]
             source_landmarks = [sample["parameters"] for sample in samples]
             if (all(landmark in source_landmarks for landmark in target_landmarks)

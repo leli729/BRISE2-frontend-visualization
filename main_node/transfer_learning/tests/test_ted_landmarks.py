@@ -3,9 +3,7 @@ import pytest
 from tools.restore_db import RestoreDB
 from transfer_learning.transfer_expediency_determination.sampling_landmark_based import SamplingLandmarkBased
 
-# A source is similar to the target only if the first MinNumberOfSamples configurations the two measured are the same (the
-# landmarks): the same sampler on the same search space draws them first. Two search spaces that merely share one
-# configuration are not the same space.
+# A source is similar to the target only if it has identical landmarks and objective functions.
 
 rdb = RestoreDB()
 
@@ -26,6 +24,15 @@ TARGET_RESULTS = [1.0, 2.0, 3.0]
 SOURCE_RESULTS = [3.0, 2.0, 1.0]
 
 
+def _objectives(name="Y1", data_type="float", minimization=True, max_expected_value=100):
+    """Context.TaskConfiguration.Objectives of one objective."""
+    return {name: {"Name": name, "DataType": data_type, "Minimization": minimization,
+                   "MinExpectedValue": 0, "MaxExpectedValue": max_expected_value}}
+
+
+MINIMIZED_Y1 = _objectives()
+
+
 def _description(comparator, similar_experiments):
     return {"SamplingLandmarkBased": {
         "MinNumberOfSamples": LANDMARKS,
@@ -34,10 +41,13 @@ def _description(comparator, similar_experiments):
         "ExperimentsQuantity": {"FixedQuantity": {"NumberOfSimilarExperiments": similar_experiments}}}}
 
 
-def _source(name, parameters_and_results):
-    return {"Exp_unique_ID": name,
-            "Samples": [{"type": 2, "parameters": parameters, "results": {"Y1": result}, "prediction_info": {}}
-                        for parameters, result in parameters_and_results]}
+def _source(name, parameters_and_results, objectives=MINIMIZED_Y1):
+    source = {"Exp_unique_ID": name,
+              "Samples": [{"type": 2, "parameters": parameters, "results": {"Y1": result}, "prediction_info": {}}
+                          for parameters, result in parameters_and_results]}
+    if objectives is not None:
+        source["Objectives"] = objectives
+    return source
 
 
 def _write_target(database, parameters_and_results):
@@ -47,10 +57,16 @@ def _write_target(database, parameters_and_results):
 
 @pytest.fixture(params=list(COMPARATORS))
 def make_ted(request):
-    """TED of a target that measured its landmarks A, B and C, taking up to the given number of similar experiments."""
+    """
+    TED of a target that measured its landmarks A, B and C, taking up to the given number of similar experiments. The
+    target has the given objectives in its description, none if they are None.
+    """
     rdb.cleanup()
 
-    def make(similar_experiments=3):
+    def make(similar_experiments=3, objectives=MINIMIZED_Y1):
+        if objectives is not None:
+            rdb.database.write_one_record("Experiment_description", {
+                "Exp_unique_ID": TARGET, "Context": {"TaskConfiguration": {"Objectives": objectives}}})
         ted = SamplingLandmarkBased(_description(request.param, similar_experiments), TARGET)
         _write_target(ted.database, list(zip([A, B, C], TARGET_RESULTS)))
         ted.database.write_one_record("Experiment_state", {"Exp_unique_ID": TARGET, "Number_of_measured_configs": LANDMARKS})
@@ -127,6 +143,45 @@ class TestDissimilarSources:
                    _source("same", list(zip([A, B, C], SOURCE_RESULTS)))]
 
         assert _taken(ted, *sources) == ["same"]
+
+
+class TestObjectives:
+    """The landmarks of all these sources are the target's, so only the objectives tell them from the similar ones."""
+
+    SAME_LANDMARKS = list(zip([A, B, C], SOURCE_RESULTS))
+
+    @pytest.mark.parametrize("objectives", [
+        pytest.param(_objectives(minimization=False), id="the other direction"),
+        pytest.param(_objectives(max_expected_value=1000), id="another expected range"),
+        pytest.param(_objectives(data_type="integer"), id="another data type"),
+        pytest.param(_objectives(name="Y2"), id="another name"),
+        pytest.param({**MINIMIZED_Y1, **_objectives(name="Y2")}, id="one more objective"),
+    ])
+    def test_a_source_with_other_objectives_is_not_taken(self, ted, objectives):
+        assert _taken(ted, _source("other", self.SAME_LANDMARKS, objectives)) == []
+
+    def test_a_source_with_no_objectives_on_record_is_not_taken(self, ted):
+        # nothing proves the direction it was optimized in
+        assert _taken(ted, _source("unknown", self.SAME_LANDMARKS, objectives=None)) == []
+
+    def test_only_the_source_with_the_objectives_of_the_target_is_taken_among_several(self, ted):
+        sources = [_source("maximized", self.SAME_LANDMARKS, _objectives(minimization=False)),
+                   _source("minimized", self.SAME_LANDMARKS),
+                   _source("unknown", self.SAME_LANDMARKS, objectives=None)]
+
+        assert _taken(ted, *sources) == ["minimized"]
+
+    def test_a_maximizing_target_takes_the_source_that_maximized(self, make_ted):
+        ted = make_ted(objectives=_objectives(minimization=False))
+        sources = [_source("maximized", self.SAME_LANDMARKS, _objectives(minimization=False)),
+                   _source("minimized", self.SAME_LANDMARKS)]
+
+        assert _taken(ted, *sources) == ["maximized"]
+
+    def test_a_target_with_no_description_takes_no_source(self, make_ted):
+        ted = make_ted(objectives=None)
+
+        assert _taken(ted, _source("same", self.SAME_LANDMARKS)) == []
 
 
 class TestRanking:

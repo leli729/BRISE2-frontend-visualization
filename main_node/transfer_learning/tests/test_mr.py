@@ -34,7 +34,6 @@ class TestMR:
         rdb.cleanup()
         rdb.restore()
         experiment, search_space = self.initialize_experiment()
-        experiment.database.write_one_record("Experiment_description", experiment.get_experiment_description_record())
         experiment.database.write_one_record(
             "Search_space", get_search_space_record(search_space, experiment.unique_id)
         )
@@ -116,7 +115,6 @@ class TestMR:
         }
 
         experiment, search_space = self.initialize_experiment(soft_constraint_skeleton)
-        experiment.database.write_one_record("Experiment_description", experiment.get_experiment_description_record())
         experiment.database.write_one_record(
             "Search_space", get_search_space_record(search_space, experiment.unique_id)
         )
@@ -228,6 +226,8 @@ class TestMR:
             modified_description.update(deepcopy(skeleton))
 
         experiment = Experiment(modified_description, search_space)
+        # main-node stores the description when it starts; TED reads the objectives of the target from it
+        experiment.database.write_one_record("Experiment_description", experiment.get_experiment_description_record())
         return experiment, search_space
 
 

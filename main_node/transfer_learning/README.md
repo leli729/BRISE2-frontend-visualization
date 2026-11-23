@@ -68,7 +68,8 @@ The functionality of the first step is covered by the [transfer_expediency_deter
 The only available strategy is a sampling-landmark-based approach, which uses one of two 
 available comparators to define the most similar experiments among all source experiments.
 The first `MinNumberOfSamples` configurations of an experiment (the default one included) are its landmarks. A source experiment
-is considered only if it began with the same landmarks as the target, in any order.
+is considered only if it began with the same landmarks as the target, in any order, and has the same objectives (names,
+directions, data types and expected ranges).
 If every configuration a similar source experiment could offer has already been measured in the target
 experiment, that source is excluded from subsequent similarity searches so a new one can be found.
 

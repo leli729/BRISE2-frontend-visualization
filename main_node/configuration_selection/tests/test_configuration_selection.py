@@ -11,7 +11,7 @@ from sklearn.linear_model import LinearRegression
 from default_config_handler.default_configuration_handler_orchestrator import DefaultConfigHandlerOrchestrator
 from core_entities.experiment import Experiment
 from core_entities.configuration import Configuration
-from core_entities.objectives import Criterion
+from core_entities.objectives import Criterion, Objectives
 from core_entities.search_space import get_search_space_record
 from tools.restore_db import RestoreDB
 
@@ -58,8 +58,6 @@ class TestConfigurationSelection:
             assert len(configs) == i + 1
             assert predicted[0].type in [Configuration.Type.FROM_SELECTOR, Configuration.Type.PREDICTED]
             experiment.add_configuration(predicted[0])
-
-            experiment.database.write_one_record("Configuration", predicted[0].get_configuration_record())
             experiment.send_state_to_db()
 
         temp_region = list(cs.predictor.mapping_region_model.keys())[0]
@@ -192,8 +190,6 @@ class TestConfigurationSelection:
             assert len(configs) == i + 1
             assert predicted[0].type in [Configuration.Type.FROM_SELECTOR, Configuration.Type.TRANSFERRED]
             experiment.add_configuration(predicted[0])
-
-            experiment.database.write_one_record("Configuration", predicted[0].get_configuration_record())
             experiment.send_state_to_db()
 
         predicted, measured = cs.send_new_configurations_to_measure("", "", "", get_workers)
@@ -210,8 +206,6 @@ class TestConfigurationSelection:
         assert configuration_transfer.has_fired
         assert transferred == 1 or len(banned) > 0
         experiment.add_configuration(predicted[0])
-
-        experiment.database.write_one_record("Configuration", predicted[0].get_configuration_record())
         experiment.send_state_to_db()
 
         temp_region = list(cs.predictor.mapping_region_model.keys())[0]
@@ -387,8 +381,6 @@ class TestConfigurationSelection:
             configs = configs + predicted
             assert len(configs) == i + 1
             experiment.add_configuration(predicted[0])
-
-            experiment.database.write_one_record("Configuration", predicted[0].get_configuration_record())
             experiment.send_state_to_db()
 
         temp_region = list(cs.predictor.mapping_region_model.keys())[0]
@@ -434,8 +426,6 @@ class TestConfigurationSelection:
             assert len(configs) == i + 1
             assert predicted[0].type is Configuration.Type.FROM_SELECTOR
             experiment.add_configuration(predicted[0])
-
-            experiment.database.write_one_record("Configuration", predicted[0].get_configuration_record())
             experiment.send_state_to_db()
 
         predicted, measured = cs.send_new_configurations_to_measure("", "", "", get_workers)
@@ -449,7 +439,6 @@ class TestConfigurationSelection:
         experiment.add_configuration(predicted[0])
         assert isinstance(list(list(cs.predictor.mapping_region_model.values())[0].mapping_surrogate_objective.keys())[
                               0].surrogate_instance, GaussianProcessRegressor)
-        experiment.database.write_one_record("Configuration", predicted[0].get_configuration_record())
         experiment.send_state_to_db()
 
         temp_region = list(cs.predictor.mapping_region_model.keys())[0]
@@ -492,8 +481,6 @@ class TestConfigurationSelection:
             assert len(configs) == i + 1
             assert predicted[0].type is Configuration.Type.FROM_SELECTOR
             experiment.add_configuration(predicted[0])
-
-            experiment.database.write_one_record("Configuration", predicted[0].get_configuration_record())
             experiment.send_state_to_db()
 
         predicted, measured = cs.send_new_configurations_to_measure("", "", "", get_workers)
@@ -505,11 +492,13 @@ class TestConfigurationSelection:
         configs = configs + predicted
         assert len(configs) == 10
         experiment.add_configuration(predicted[0])
-        experiment.database.write_one_record("Configuration", predicted[0].get_configuration_record())
         experiment.send_state_to_db()
 
         temp_region = list(cs.predictor.mapping_region_model.keys())[0]
         assert len(cs.predictor.mapping_region_model[temp_region].mapping_surrogate_objective) == 1  # SO
+        similar_experiments = cs.transfer_learning_orchestrator.ted_module.similar_experiments
+        assert len(similar_experiments) == 1  # the source of the same search space, sampler, default and objective
+        assert Objectives.from_description(similar_experiments[0]["Objectives"]) == experiment.objectives
         experiment.dump("Results")
 
     def test_12(self, get_experiment, get_workers, get_configurations_all_types):
@@ -548,8 +537,6 @@ class TestConfigurationSelection:
             assert len(configs) == i + 1
             assert predicted[0].type is Configuration.Type.FROM_SELECTOR
             experiment.add_configuration(predicted[0])
-
-            experiment.database.write_one_record("Configuration", predicted[0].get_configuration_record())
             experiment.send_state_to_db()
 
         predicted, measured = cs.send_new_configurations_to_measure("", "", "", get_workers)
@@ -561,11 +548,15 @@ class TestConfigurationSelection:
         configs = configs + predicted
         assert len(configs) == 10
         experiment.add_configuration(predicted[0])
-        experiment.database.write_one_record("Configuration", predicted[0].get_configuration_record())
         experiment.send_state_to_db()
 
         temp_region = list(cs.predictor.mapping_region_model.keys())[0]
         assert len(cs.predictor.mapping_region_model[temp_region].mapping_surrogate_objective) == 1  # SO
+        similar_experiments = cs.transfer_learning_orchestrator.ted_module.similar_experiments
+        assert len(similar_experiments) == 1  # the source of the same search space, sampler, default and objective
+        assert Objectives.from_description(similar_experiments[0]["Objectives"]) == experiment.objectives
+        model_transfer = cs.transfer_learning_orchestrator.transfer_submodules["Model_transfer"]
+        assert model_transfer.was_model_transferred
         experiment.dump("Results")
 
     def test_13(self, get_experiment, get_workers, get_configurations_all_types):
@@ -603,8 +594,6 @@ class TestConfigurationSelection:
             assert len(configs) == i + 1
             assert predicted[0].type is Configuration.Type.FROM_SELECTOR
             experiment.add_configuration(predicted[0])
-
-            experiment.database.write_one_record("Configuration", predicted[0].get_configuration_record())
             experiment.send_state_to_db()
 
         predicted, measured = cs.send_new_configurations_to_measure("", "", "", get_workers)
@@ -616,11 +605,13 @@ class TestConfigurationSelection:
         configs = configs + predicted
         assert len(configs) == 10
         experiment.add_configuration(predicted[0])
-        experiment.database.write_one_record("Configuration", predicted[0].get_configuration_record())
         experiment.send_state_to_db()
 
         temp_region = list(cs.predictor.mapping_region_model.keys())[0]
         assert len(cs.predictor.mapping_region_model[temp_region].mapping_surrogate_objective) == 1  # SO
+        similar_experiments = cs.transfer_learning_orchestrator.ted_module.similar_experiments
+        assert len(similar_experiments) == 1  # the source of the same search space, sampler, default and objective
+        assert Objectives.from_description(similar_experiments[0]["Objectives"]) == experiment.objectives
         experiment.dump("Results")
 
     @staticmethod
@@ -742,8 +733,6 @@ class TestConfigurationSelection:
             assert len(configs) == i + 1
             assert predicted[0].type is Configuration.Type.FROM_SELECTOR
             experiment.add_configuration(predicted[0])
-
-            experiment.database.write_one_record("Configuration", predicted[0].get_configuration_record())
             experiment.send_state_to_db()
 
         predicted, measured = cs.send_new_configurations_to_measure("", "", "", get_workers)
@@ -757,7 +746,6 @@ class TestConfigurationSelection:
         experiment.add_configuration(predicted[0])
         assert isinstance(list(list(cs.predictor.mapping_region_model.values())[0].mapping_surrogate_objective.keys())[
                               0].surrogate_instance, GaussianProcessRegressor)
-        experiment.database.write_one_record("Configuration", predicted[0].get_configuration_record())
         experiment.send_state_to_db()
 
         temp_region = list(cs.predictor.mapping_region_model.keys())[0]
@@ -876,8 +864,6 @@ class TestConfigurationSelection:
             configs = configs + predicted
             assert len(configs) == i + 1
             experiment.add_configuration(predicted[0])
-
-            experiment.database.write_one_record("Configuration", predicted[0].get_configuration_record())
             experiment.send_state_to_db()
 
         assert sum(c.type is Configuration.Type.TRANSFERRED for c in configs) <= 1
