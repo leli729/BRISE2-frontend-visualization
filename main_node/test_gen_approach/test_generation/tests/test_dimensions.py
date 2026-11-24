@@ -1,3 +1,5 @@
+from collections import Counter
+
 import pytest
 
 from generator_paths import BASE, GRAMMAR
@@ -178,3 +180,25 @@ def test_every_configuration_selects_one_option_of_each_dimension_in_order(parse
 
 def test_the_pairwise_set_covers_every_context(configurations):
     assert {configuration.context_variant for configuration in configurations} == set(CONTEXT_VARIANTS)
+
+
+# an enum attribute is owned by the feature that declares it (a place); the generator's dimension has no place
+
+def test_an_enum_attribute_is_declared_in_as_many_places_as_the_model_has(parser):
+    places = Counter(attribute for _, attribute in parser.parse_enum_places())
+
+    assert places == Counter({"TimeUnit": 4, "kernel": 1, "GammaType": 1, "CType": 1, "activation": 1, "solver": 1,
+                              "BandwidthType": 1, "ThresholdType": 1})
+
+
+def test_an_enum_attribute_is_owned_by_the_feature_that_declares_it(parser):
+    places = {(attribute, place) for place, attribute in parser.parse_enum_places()}
+
+    assert {("TimeUnit", place) for place in (
+        "Context.TaskConfiguration",
+        "StopCondition.Instance.TimeBasedSC.Parameters",
+        "StopCondition.StopConditionTriggerLogic.InspectionParameters",
+        "TransferLearning.ModelRecommendation.DynamicModelsRecommendation",
+    )} <= places
+    assert ("kernel", f"{SURROGATE}.Instance.SupportVectorRegression.Parameters") in places
+    assert ("GammaType", f"{SURROGATE}.Instance.SupportVectorRegression") in places

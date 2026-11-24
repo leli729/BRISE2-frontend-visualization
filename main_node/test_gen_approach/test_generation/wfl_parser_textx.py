@@ -16,8 +16,11 @@ How to use:
 """
 
 import re
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Tuple
 from textx import metamodel_from_file
+
+# the declaration of an enum attribute: [TimeUnit in {"seconds", "minutes"}]
+ENUM_PATTERN = re.compile(r'\[(\w+)\s+in\s+\{([^}]+)\}\]')
 
 
 class WflParserTextX:
@@ -231,9 +234,7 @@ class WflParserTextX:
             return self._enums_cache
         
         result = {}
-        enum_pattern = r'\[(\w+)\s+in\s+\{([^}]+)\}\]'
-
-        for match in re.finditer(enum_pattern, self.raw_content):
+        for match in re.finditer(ENUM_PATTERN, self.raw_content):
             attr_name = match.group(1)
             values_str = match.group(2)
             values = re.findall(r'"([^"]+)"', values_str)
@@ -246,6 +247,31 @@ class WflParserTextX:
         self._enums_cache = result
         return result
     
+    def parse_enum_places(self) -> List[Tuple[str, str]]:
+        """
+        The places of the enum attributes: one (feature path, attribute) pair for every declaration.
+
+        An attribute declared in several features (TimeUnit) has a place in each; the path is the one of the feature
+        that holds the declaration, abstract features not counted.
+        """
+        places = []
+        for element in self.model.elements:
+            if self._get_class_name(element) == 'Feature':
+                self._collect_enum_places(element, [], places)
+        return places
+
+    def _collect_enum_places(self, feature, parent_path: List[str], places: List[Tuple[str, str]]):
+        path = parent_path if feature.abstract else parent_path + [feature.name]
+        for nested in feature.nested or []:
+            for child in nested.child or []:
+                kind = self._get_class_name(child)
+                if kind == 'Feature':
+                    self._collect_enum_places(child, path, places)
+                elif kind == 'Constraint':
+                    declaration = ENUM_PATTERN.fullmatch(self.raw_content[child._tx_position:child._tx_position_end].strip())
+                    if declaration:
+                        places.append((".".join(path), declaration.group(1)))
+
     def parse_enum_dimensions(self) -> List[List[str]]:
         """
         One pairwise dimension per enum attribute (an attribute declared several times is one dimension).
