@@ -2,8 +2,8 @@
     "Context": {
         "TaskConfiguration": {
             "TaskName": "test",
-            "MaxTimeToRunTask": 0,
-            "TimeUnit": "seconds",
+            "MaxTimeToRunTask": 10,
+            "TimeUnit": "days",
             "Scenario": {},
             "Objectives": {
                 "Y1": {
@@ -16,7 +16,7 @@
                 "Y2": {
                     "Name": "Y2",
                     "DataType": "float",
-                    "Minimization": true,
+                    "Minimization": false,
                     "MinExpectedValue": 0,
                     "MaxExpectedValue": 100
                 },
@@ -46,28 +46,28 @@
         "SearchSpace": {
             "X1": {
                 "Lower": 0.0,
-                "Upper": 10.0,
+                "Upper": 1.0,
                 "Default": 0.0,
                 "Type": "FloatHyperparameter",
                 "Level": 0
             },
             "X2": {
                 "Lower": 0.0,
-                "Upper": 10.0,
-                "Default": 0.0,
+                "Upper": 1.0,
+                "Default": 0.5,
                 "Type": "FloatHyperparameter",
                 "Level": 0
             },
             "Structure": {
-                "Hierarchical": {}
+                "Flat": {}
             }
         }
     },
     "ConfigurationSelection": {
         "SamplingStrategy": {
-            "MersenneTwister": {
-                "Seed": 3,
-                "Type": "mersenne_twister"
+            "Sobol": {
+                "Seed": 1,
+                "Type": "sobol"
             }
         },
         "Predictor": {
@@ -75,21 +75,61 @@
             "Model": {
                 "MultiObjectiveHandling": {
                     "SurrogateType": {
-                        "Scalar": {}
+                        "DynamicCompositional": {}
                     }
                 },
                 "Surrogate": {
                     "ConfigurationTransformers": {
-                        "NominalTransformer": {
-                            "SklearnBinaryEncoder": {
-                                "Type": "sklearn_binary_transformer",
+                        "OrdinalTransformer": {
+                            "SklearnOrdinalEncoder": {
+                                "Type": "sklearn_ordinal_transformer",
                                 "Class": "sklearn.OrdinalEncoder"
+                            }
+                        },
+                        "FloatTransformer": {
+                            "SklearnFloatMinMaxScaler": {
+                                "Type": "sklearn_float_transformer",
+                                "Class": "sklearn.MinMaxScaler"
+                            }
+                        }
+                    },
+                    "Instance": {
+                        "ModelMock": {
+                            "MultiObjective": true,
+                            "Type": "model_mock"
+                        }
+                    }
+                },
+                "Optimizer": {
+                    "ConfigurationTransformers": {
+                        "OrdinalTransformer": {
+                            "SklearnOrdinalEncoder": {
+                                "Type": "sklearn_ordinal_transformer",
+                                "Class": "sklearn.OrdinalEncoder"
+                            }
+                        },
+                        "NominalTransformer": {
+                            "BinaryEncoder": {
+                                "Type": "binary_transformer",
+                                "Class": "brise.BinaryEncoder"
+                            }
+                        },
+                        "IntegerTransformer": {
+                            "SklearnIntMinMaxScaler": {
+                                "Type": "sklearn_integer_transformer",
+                                "Class": "sklearn.MinMaxScaler"
+                            }
+                        },
+                        "FloatTransformer": {
+                            "SklearnFloatMinMaxScaler": {
+                                "Type": "sklearn_float_transformer",
+                                "Class": "sklearn.MinMaxScaler"
                             }
                         }
                     },
                     "ValueTransformers": {
                         "ValueScalarizator": {
-                            "WeightedSum": {
+                            "NormalizedWeightedSum": {
                                 "Weights": [
                                     1,
                                     1,
@@ -97,45 +137,26 @@
                                     1,
                                     1
                                 ],
-                                "Type": "weighted_sum"
-                            }
-                        }
-                    },
-                    "Instance": {
-                        "SupportVectorRegression": {
-                            "MultiObjective": false,
-                            "GammaType": "scale",
-                            "GammaFloat": 1.0,
-                            "Parameters": {
-                                "kernel": "rbf",
-                                "C": 10.0,
-                                "gamma": "scale",
-                                "epsilon": 0.0
-                            },
-                            "Type": "sklearn_model_wrapper",
-                            "Class": "sklearn.svm.SVR"
-                        }
-                    }
-                },
-                "Optimizer": {
-                    "ConfigurationTransformers": {
-                        "NominalTransformer": {
-                            "SklearnBinaryEncoder": {
-                                "Type": "sklearn_binary_transformer",
-                                "Class": "sklearn.OrdinalEncoder"
+                                "Type": "normalized_weighted_sum"
                             }
                         }
                     },
                     "Instance": {
                         "MOEA": {
-                            "Generations": 10,
+                            "Generations": 2,
                             "PopulationSize": 70,
                             "Algorithms": {
-                                "MOEAD": {
-                                    "MultiObjective": true
+                                "BEE_COLONY": {
+                                    "MultiObjective": false
                                 },
-                                "MOEAD_GEN": {
-                                    "MultiObjective": true
+                                "DE1220": {
+                                    "MultiObjective": false
+                                },
+                                "CMAES": {
+                                    "MultiObjective": false
+                                },
+                                "PSO_GEN": {
+                                    "MultiObjective": false
                                 }
                             },
                             "Type": "moea"
@@ -144,21 +165,15 @@
                 },
                 "Validator": {
                     "ExternalValidator": {
-                        "QualityValidator": {
-                            "Split": {
-                                "KFold": {
-                                    "NumberOfFolds": 2
-                                }
-                            },
-                            "QualityThreshold": 1.0,
-                            "Type": "quality_validator"
+                        "MockValidator": {
+                            "Type": "mock_validator"
                         }
                     }
                 },
                 "CandidateSelector": {
-                    "BestMultiPointProposal": {
+                    "RandomMultiPointProposal": {
                         "NumberOfPoints": 1,
-                        "Type": "best_multi_point"
+                        "Type": "random_multi_point"
                     }
                 }
             }
@@ -167,17 +182,9 @@
     "RepetitionManager": {
         "MaxFailedTasksPerConfiguration": 3,
         "Instance": {
-            "AcceptableErrorBased": {
-                "MinTasksPerConfiguration": 2,
+            "QuantityBased": {
                 "MaxTasksPerConfiguration": 3,
-                "BaseAcceptableError": 1.0,
-                "ConfidenceLevel": 1.0,
-                "Type": "acceptable_error_based",
-                "ExperimentAware": {
-                    "MaxAcceptableError": 50.0,
-                    "RatioMax": 10.0,
-                    "MinTasksPerUnderperformingConfiguration": 1
-                }
+                "Type": "quantity_based"
             }
         }
     },
@@ -190,21 +197,40 @@
                 "Type": "bad_configuration_based",
                 "Name": "SC1"
             },
-            "GuaranteedSC": {
-                "Type": "guaranteed",
+            "ImprovementBasedSC": {
+                "Parameters": {
+                    "MaxConfigsWithoutImprovement": 5
+                },
+                "Type": "improvement_based",
                 "Name": "SC2"
             },
-            "ValidationBasedSC": {
-                "Type": "validation_based",
+            "QuantityBasedSC": {
+                "Parameters": {
+                    "MaxConfigs": 10
+                },
+                "Type": "quantity_based",
                 "Name": "SC3"
+            },
+            "TimeBasedSC": {
+                "Parameters": {
+                    "MaxRunTime": 10,
+                    "TimeUnit": "days"
+                },
+                "Type": "time_based",
+                "Name": "SC4"
             }
         },
         "StopConditionTriggerLogic": {
-            "Expression": "StopCondition1",
+            "Expression": "SC1 or SC2 or SC3 or SC4",
             "InspectionParameters": {
                 "RepetitionPeriod": 5,
-                "TimeUnit": "seconds"
+                "TimeUnit": "days"
             }
+        }
+    },
+    "DistributionMode": {
+        "AsynchronousDistribution": {
+            "Type": "asynchronous_distribution"
         }
     },
     "DefaultConfigurationHandler": {

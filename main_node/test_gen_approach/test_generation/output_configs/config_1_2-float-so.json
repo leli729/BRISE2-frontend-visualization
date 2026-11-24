@@ -1,0 +1,147 @@
+{
+    "Context": {
+        "TaskConfiguration": {
+            "TaskName": "test",
+            "MaxTimeToRunTask": 10,
+            "TimeUnit": "minutes",
+            "Scenario": {},
+            "Objectives": {
+                "Y1": {
+                    "Name": "Y1",
+                    "DataType": "float",
+                    "Minimization": false,
+                    "MinExpectedValue": 0,
+                    "MaxExpectedValue": 100
+                }
+            }
+        },
+        "SearchSpace": {
+            "X1": {
+                "Lower": 0.0,
+                "Upper": 1.0,
+                "Default": 0.0,
+                "Type": "FloatHyperparameter",
+                "Level": 0
+            },
+            "X2": {
+                "Lower": 0.0,
+                "Upper": 1.0,
+                "Default": 0.5,
+                "Type": "FloatHyperparameter",
+                "Level": 0
+            },
+            "Structure": {
+                "Hierarchical": {}
+            }
+        }
+    },
+    "ConfigurationSelection": {
+        "SamplingStrategy": {
+            "MersenneTwister": {
+                "Seed": 1,
+                "Type": "mersenne_twister"
+            }
+        },
+        "Predictor": {
+            "WindowSize": 1.0,
+            "Model": {
+                "Surrogate": {
+                    "Instance": {
+                        "SupportVectorRegression": {
+                            "MultiObjective": false,
+                            "GammaType": "auto",
+                            "GammaFloat": 1.0,
+                            "Parameters": {
+                                "kernel": "poly",
+                                "C": 10.0,
+                                "gamma": "auto",
+                                "epsilon": 0.0
+                            },
+                            "Type": "sklearn_model_wrapper",
+                            "Class": "sklearn.svm.SVR"
+                        }
+                    }
+                },
+                "Optimizer": {
+                    "ConfigurationTransformers": {
+                        "OrdinalTransformer": {
+                            "SklearnOrdinalEncoder": {
+                                "Type": "sklearn_ordinal_transformer",
+                                "Class": "sklearn.OrdinalEncoder"
+                            }
+                        },
+                        "NominalTransformer": {
+                            "SklearnBinaryEncoder": {
+                                "Type": "sklearn_binary_transformer",
+                                "Class": "sklearn.OrdinalEncoder"
+                            }
+                        },
+                        "IntegerTransformer": {
+                            "SklearnIntMinMaxScaler": {
+                                "Type": "sklearn_integer_transformer",
+                                "Class": "sklearn.MinMaxScaler"
+                            }
+                        }
+                    },
+                    "Instance": {
+                        "MOEA": {
+                            "Generations": 2,
+                            "PopulationSize": 72,
+                            "Algorithms": {
+                                "GACO": {
+                                    "MultiObjective": false
+                                }
+                            },
+                            "Type": "moea"
+                        }
+                    }
+                },
+                "Validator": {
+                    "ExternalValidator": {
+                        "MockValidator": {
+                            "Type": "mock_validator"
+                        }
+                    }
+                },
+                "CandidateSelector": {
+                    "RandomMultiPointProposal": {
+                        "NumberOfPoints": 1,
+                        "Type": "random_multi_point"
+                    }
+                }
+            }
+        }
+    },
+    "RepetitionManager": {
+        "MaxFailedTasksPerConfiguration": 3,
+        "Instance": {
+            "QuantityBased": {
+                "MaxTasksPerConfiguration": 3,
+                "Type": "quantity_based"
+            }
+        }
+    },
+    "StopCondition": {
+        "Instance": {
+            "QuantityBasedSC": {
+                "Parameters": {
+                    "MaxConfigs": 10
+                },
+                "Type": "quantity_based",
+                "Name": "SC1"
+            }
+        },
+        "StopConditionTriggerLogic": {
+            "Expression": "SC1",
+            "InspectionParameters": {
+                "RepetitionPeriod": 5,
+                "TimeUnit": "minutes"
+            }
+        }
+    },
+    "DistributionMode": {
+        "AsynchronousDistribution": {
+            "Type": "asynchronous_distribution"
+        }
+    }
+}

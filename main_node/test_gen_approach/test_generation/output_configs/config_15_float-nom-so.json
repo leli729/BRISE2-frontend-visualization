@@ -1,0 +1,206 @@
+{
+    "Context": {
+        "TaskConfiguration": {
+            "TaskName": "test",
+            "MaxTimeToRunTask": 10,
+            "TimeUnit": "minutes",
+            "Scenario": {},
+            "Objectives": {
+                "Y1": {
+                    "Name": "Y1",
+                    "DataType": "float",
+                    "Minimization": true,
+                    "MinExpectedValue": 0,
+                    "MaxExpectedValue": 100
+                }
+            }
+        },
+        "SearchSpace": {
+            "F": {
+                "Lower": -100.5,
+                "Upper": 457.98,
+                "Default": -7.0,
+                "Type": "FloatHyperparameter",
+                "Level": 0
+            },
+            "N": {
+                "N1": {
+                    "Type": "Category"
+                },
+                "N2": {
+                    "Type": "Category"
+                },
+                "Categories": [
+                    "Context.SearchSpace.N.N1",
+                    "Context.SearchSpace.N.N2"
+                ],
+                "Default": "Context.SearchSpace.N.N1",
+                "Type": "NominalHyperparameter",
+                "Level": 0
+            },
+            "Structure": {
+                "Hierarchical": {}
+            }
+        }
+    },
+    "ConfigurationSelection": {
+        "SamplingStrategy": {
+            "MersenneTwister": {
+                "Seed": 1,
+                "Type": "mersenne_twister"
+            }
+        },
+        "Predictor": {
+            "WindowSize": 1.0,
+            "Model": {
+                "Surrogate": {
+                    "ConfigurationTransformers": {
+                        "NominalTransformer": {
+                            "BinaryEncoder": {
+                                "Type": "binary_transformer",
+                                "Class": "brise.BinaryEncoder"
+                            }
+                        },
+                        "IntegerTransformer": {
+                            "SklearnIntMinMaxScaler": {
+                                "Type": "sklearn_integer_transformer",
+                                "Class": "sklearn.MinMaxScaler"
+                            }
+                        }
+                    },
+                    "Instance": {
+                        "LinearRegression": {
+                            "MultiObjective": false,
+                            "Type": "sklearn_model_wrapper",
+                            "Class": "sklearn.linear_model.LinearRegression"
+                        }
+                    }
+                },
+                "Optimizer": {
+                    "ConfigurationTransformers": {
+                        "OrdinalTransformer": {
+                            "SklearnOrdinalEncoder": {
+                                "Type": "sklearn_ordinal_transformer",
+                                "Class": "sklearn.OrdinalEncoder"
+                            }
+                        },
+                        "NominalTransformer": {
+                            "BinaryEncoder": {
+                                "Type": "binary_transformer",
+                                "Class": "brise.BinaryEncoder"
+                            }
+                        },
+                        "FloatTransformer": {
+                            "SklearnFloatMinMaxScaler": {
+                                "Type": "sklearn_float_transformer",
+                                "Class": "sklearn.MinMaxScaler"
+                            }
+                        }
+                    },
+                    "Instance": {
+                        "RandomSearch": {
+                            "SamplingSize": 1,
+                            "MultiObjective": true,
+                            "Type": "random_search"
+                        }
+                    }
+                },
+                "Validator": {
+                    "ExternalValidator": {
+                        "MockValidator": {
+                            "Type": "mock_validator"
+                        }
+                    }
+                },
+                "CandidateSelector": {
+                    "RandomMultiPointProposal": {
+                        "NumberOfPoints": 1,
+                        "Type": "random_multi_point"
+                    }
+                }
+            }
+        }
+    },
+    "RepetitionManager": {
+        "MaxFailedTasksPerConfiguration": 3,
+        "Instance": {
+            "QuantityBased": {
+                "MaxTasksPerConfiguration": 3,
+                "Type": "quantity_based"
+            }
+        }
+    },
+    "StopCondition": {
+        "Instance": {
+            "BadConfigurationBasedSC": {
+                "Parameters": {
+                    "MaxBadConfigurations": 5
+                },
+                "Type": "bad_configuration_based",
+                "Name": "SC1"
+            },
+            "FewShotLearningBasedSC": {
+                "Type": "few_shot_learning_based",
+                "Name": "SC2"
+            },
+            "TimeBasedSC": {
+                "Parameters": {
+                    "MaxRunTime": 10,
+                    "TimeUnit": "minutes"
+                },
+                "Type": "time_based",
+                "Name": "SC3"
+            },
+            "ValidationBasedSC": {
+                "Type": "validation_based",
+                "Name": "SC4"
+            }
+        },
+        "StopConditionTriggerLogic": {
+            "Expression": "SC1 or SC2 or SC3 or SC4",
+            "InspectionParameters": {
+                "RepetitionPeriod": 5,
+                "TimeUnit": "minutes"
+            }
+        }
+    },
+    "DistributionMode": {
+        "AsynchronousDistribution": {
+            "Type": "asynchronous_distribution"
+        }
+    },
+    "TransferLearning": {
+        "TransferExpediencyDetermination": {
+            "SamplingLandmarkBased": {
+                "MinNumberOfSamples": 5,
+                "Type": "sampling_landmark_based",
+                "Comparator": {
+                    "NormDifference": {
+                        "Type": "norm_difference_comparator"
+                    }
+                },
+                "ExperimentsQuantity": {
+                    "FixedQuantity": {
+                        "NumberOfSimilarExperiments": 3
+                    }
+                }
+            }
+        },
+        "ModelRecommendation": {
+            "FewShotRecommendation": {
+                "Type": "few_shot"
+            }
+        },
+        "MultiTaskLearning": {
+            "Filters": {
+                "OldNewRatio": {
+                    "Type": "old_new_ratio",
+                    "OldNewConfigsRatio": 10.0
+                },
+                "ShuffleConfigurations": {
+                    "Type": "shuffle"
+                }
+            }
+        }
+    }
+}

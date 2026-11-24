@@ -2,7 +2,7 @@
     "Context": {
         "TaskConfiguration": {
             "TaskName": "test",
-            "MaxTimeToRunTask": 0,
+            "MaxTimeToRunTask": 10,
             "TimeUnit": "seconds",
             "Scenario": {},
             "Objectives": {
@@ -16,7 +16,7 @@
                 "Y2": {
                     "Name": "Y2",
                     "DataType": "float",
-                    "Minimization": true,
+                    "Minimization": false,
                     "MinExpectedValue": 0,
                     "MaxExpectedValue": 100
                 },
@@ -45,9 +45,9 @@
         },
         "SearchSpace": {
             "F": {
-                "Lower": 0.0,
-                "Upper": 10.0,
-                "Default": 0.0,
+                "Lower": -100.5,
+                "Upper": 457.98,
+                "Default": -7.0,
                 "Type": "FloatHyperparameter",
                 "Level": 0
             },
@@ -74,7 +74,7 @@
     "ConfigurationSelection": {
         "SamplingStrategy": {
             "MersenneTwister": {
-                "Seed": 3,
+                "Seed": 1,
                 "Type": "mersenne_twister"
             }
         },
@@ -88,29 +88,29 @@
                 },
                 "Validator": {
                     "ExternalValidator": {
-                        "QualityValidator": {
-                            "Split": {
-                                "KFold": {
-                                    "NumberOfFolds": 2
-                                }
-                            },
-                            "QualityThreshold": 1.0,
-                            "Type": "quality_validator"
+                        "MockValidator": {
+                            "Type": "mock_validator"
                         }
                     }
                 },
                 "CandidateSelector": {
-                    "RandomMultiPointProposal": {
+                    "BestMultiPointProposal": {
                         "NumberOfPoints": 1,
-                        "Type": "random_multi_point"
+                        "Type": "best_multi_point"
                     }
                 },
                 "Surrogate_0": {
                     "ConfigurationTransformers": {
                         "NominalTransformer": {
-                            "SklearnBinaryEncoder": {
-                                "Type": "sklearn_binary_transformer",
-                                "Class": "sklearn.OrdinalEncoder"
+                            "BinaryEncoder": {
+                                "Type": "binary_transformer",
+                                "Class": "brise.BinaryEncoder"
+                            }
+                        },
+                        "FloatTransformer": {
+                            "SklearnFloatMinMaxScaler": {
+                                "Type": "sklearn_float_transformer",
+                                "Class": "sklearn.MinMaxScaler"
                             }
                         }
                     },
@@ -121,8 +121,8 @@
                                 "hidden_layer_sizes": [
                                     100
                                 ],
-                                "activation": "relu",
-                                "solver": "adam",
+                                "activation": "tanh",
+                                "solver": "lbfgs",
                                 "alpha": 0.0
                             },
                             "Type": "sklearn_model_wrapper",
@@ -133,9 +133,15 @@
                 "Surrogate_1": {
                     "ConfigurationTransformers": {
                         "NominalTransformer": {
-                            "SklearnBinaryEncoder": {
-                                "Type": "sklearn_binary_transformer",
-                                "Class": "sklearn.OrdinalEncoder"
+                            "BinaryEncoder": {
+                                "Type": "binary_transformer",
+                                "Class": "brise.BinaryEncoder"
+                            }
+                        },
+                        "FloatTransformer": {
+                            "SklearnFloatMinMaxScaler": {
+                                "Type": "sklearn_float_transformer",
+                                "Class": "sklearn.MinMaxScaler"
                             }
                         }
                     },
@@ -146,8 +152,8 @@
                                 "hidden_layer_sizes": [
                                     100
                                 ],
-                                "activation": "relu",
-                                "solver": "adam",
+                                "activation": "tanh",
+                                "solver": "lbfgs",
                                 "alpha": 0.0
                             },
                             "Type": "sklearn_model_wrapper",
@@ -158,9 +164,15 @@
                 "Surrogate_2": {
                     "ConfigurationTransformers": {
                         "NominalTransformer": {
-                            "SklearnBinaryEncoder": {
-                                "Type": "sklearn_binary_transformer",
-                                "Class": "sklearn.OrdinalEncoder"
+                            "BinaryEncoder": {
+                                "Type": "binary_transformer",
+                                "Class": "brise.BinaryEncoder"
+                            }
+                        },
+                        "FloatTransformer": {
+                            "SklearnFloatMinMaxScaler": {
+                                "Type": "sklearn_float_transformer",
+                                "Class": "sklearn.MinMaxScaler"
                             }
                         }
                     },
@@ -171,8 +183,8 @@
                                 "hidden_layer_sizes": [
                                     100
                                 ],
-                                "activation": "relu",
-                                "solver": "adam",
+                                "activation": "tanh",
+                                "solver": "lbfgs",
                                 "alpha": 0.0
                             },
                             "Type": "sklearn_model_wrapper",
@@ -183,9 +195,15 @@
                 "Surrogate_3": {
                     "ConfigurationTransformers": {
                         "NominalTransformer": {
-                            "SklearnBinaryEncoder": {
-                                "Type": "sklearn_binary_transformer",
-                                "Class": "sklearn.OrdinalEncoder"
+                            "BinaryEncoder": {
+                                "Type": "binary_transformer",
+                                "Class": "brise.BinaryEncoder"
+                            }
+                        },
+                        "FloatTransformer": {
+                            "SklearnFloatMinMaxScaler": {
+                                "Type": "sklearn_float_transformer",
+                                "Class": "sklearn.MinMaxScaler"
                             }
                         }
                     },
@@ -196,8 +214,8 @@
                                 "hidden_layer_sizes": [
                                     100
                                 ],
-                                "activation": "relu",
-                                "solver": "adam",
+                                "activation": "tanh",
+                                "solver": "lbfgs",
                                 "alpha": 0.0
                             },
                             "Type": "sklearn_model_wrapper",
@@ -208,9 +226,15 @@
                 "Surrogate_4": {
                     "ConfigurationTransformers": {
                         "NominalTransformer": {
-                            "SklearnBinaryEncoder": {
-                                "Type": "sklearn_binary_transformer",
-                                "Class": "sklearn.OrdinalEncoder"
+                            "BinaryEncoder": {
+                                "Type": "binary_transformer",
+                                "Class": "brise.BinaryEncoder"
+                            }
+                        },
+                        "FloatTransformer": {
+                            "SklearnFloatMinMaxScaler": {
+                                "Type": "sklearn_float_transformer",
+                                "Class": "sklearn.MinMaxScaler"
                             }
                         }
                     },
@@ -221,8 +245,8 @@
                                 "hidden_layer_sizes": [
                                     100
                                 ],
-                                "activation": "relu",
-                                "solver": "adam",
+                                "activation": "tanh",
+                                "solver": "lbfgs",
                                 "alpha": 0.0
                             },
                             "Type": "sklearn_model_wrapper",
@@ -232,171 +256,146 @@
                 },
                 "Optimizer_0": {
                     "ConfigurationTransformers": {
+                        "OrdinalTransformer": {
+                            "SklearnOrdinalEncoder": {
+                                "Type": "sklearn_ordinal_transformer",
+                                "Class": "sklearn.OrdinalEncoder"
+                            }
+                        },
                         "NominalTransformer": {
                             "SklearnBinaryEncoder": {
                                 "Type": "sklearn_binary_transformer",
                                 "Class": "sklearn.OrdinalEncoder"
                             }
+                        },
+                        "IntegerTransformer": {
+                            "SklearnIntMinMaxScaler": {
+                                "Type": "sklearn_integer_transformer",
+                                "Class": "sklearn.MinMaxScaler"
+                            }
                         }
                     },
                     "Instance": {
-                        "MOEA": {
-                            "Generations": 10,
-                            "PopulationSize": 70,
-                            "Algorithms": {
-                                "GWO": {
-                                    "MultiObjective": false
-                                },
-                                "DE": {
-                                    "MultiObjective": false
-                                },
-                                "SADE": {
-                                    "MultiObjective": false
-                                },
-                                "CMAES": {
-                                    "MultiObjective": false
-                                },
-                                "PSO_GEN": {
-                                    "MultiObjective": false
-                                }
-                            },
-                            "Type": "moea"
+                        "RandomSearch": {
+                            "SamplingSize": 1,
+                            "MultiObjective": true,
+                            "Type": "random_search"
                         }
                     }
                 },
                 "Optimizer_1": {
                     "ConfigurationTransformers": {
+                        "OrdinalTransformer": {
+                            "SklearnOrdinalEncoder": {
+                                "Type": "sklearn_ordinal_transformer",
+                                "Class": "sklearn.OrdinalEncoder"
+                            }
+                        },
                         "NominalTransformer": {
                             "SklearnBinaryEncoder": {
                                 "Type": "sklearn_binary_transformer",
                                 "Class": "sklearn.OrdinalEncoder"
                             }
+                        },
+                        "IntegerTransformer": {
+                            "SklearnIntMinMaxScaler": {
+                                "Type": "sklearn_integer_transformer",
+                                "Class": "sklearn.MinMaxScaler"
+                            }
                         }
                     },
                     "Instance": {
-                        "MOEA": {
-                            "Generations": 10,
-                            "PopulationSize": 70,
-                            "Algorithms": {
-                                "GWO": {
-                                    "MultiObjective": false
-                                },
-                                "DE": {
-                                    "MultiObjective": false
-                                },
-                                "SADE": {
-                                    "MultiObjective": false
-                                },
-                                "CMAES": {
-                                    "MultiObjective": false
-                                },
-                                "PSO_GEN": {
-                                    "MultiObjective": false
-                                }
-                            },
-                            "Type": "moea"
+                        "RandomSearch": {
+                            "SamplingSize": 1,
+                            "MultiObjective": true,
+                            "Type": "random_search"
                         }
                     }
                 },
                 "Optimizer_2": {
                     "ConfigurationTransformers": {
+                        "OrdinalTransformer": {
+                            "SklearnOrdinalEncoder": {
+                                "Type": "sklearn_ordinal_transformer",
+                                "Class": "sklearn.OrdinalEncoder"
+                            }
+                        },
                         "NominalTransformer": {
                             "SklearnBinaryEncoder": {
                                 "Type": "sklearn_binary_transformer",
                                 "Class": "sklearn.OrdinalEncoder"
                             }
+                        },
+                        "IntegerTransformer": {
+                            "SklearnIntMinMaxScaler": {
+                                "Type": "sklearn_integer_transformer",
+                                "Class": "sklearn.MinMaxScaler"
+                            }
                         }
                     },
                     "Instance": {
-                        "MOEA": {
-                            "Generations": 10,
-                            "PopulationSize": 70,
-                            "Algorithms": {
-                                "GWO": {
-                                    "MultiObjective": false
-                                },
-                                "DE": {
-                                    "MultiObjective": false
-                                },
-                                "SADE": {
-                                    "MultiObjective": false
-                                },
-                                "CMAES": {
-                                    "MultiObjective": false
-                                },
-                                "PSO_GEN": {
-                                    "MultiObjective": false
-                                }
-                            },
-                            "Type": "moea"
+                        "RandomSearch": {
+                            "SamplingSize": 1,
+                            "MultiObjective": true,
+                            "Type": "random_search"
                         }
                     }
                 },
                 "Optimizer_3": {
                     "ConfigurationTransformers": {
+                        "OrdinalTransformer": {
+                            "SklearnOrdinalEncoder": {
+                                "Type": "sklearn_ordinal_transformer",
+                                "Class": "sklearn.OrdinalEncoder"
+                            }
+                        },
                         "NominalTransformer": {
                             "SklearnBinaryEncoder": {
                                 "Type": "sklearn_binary_transformer",
                                 "Class": "sklearn.OrdinalEncoder"
                             }
+                        },
+                        "IntegerTransformer": {
+                            "SklearnIntMinMaxScaler": {
+                                "Type": "sklearn_integer_transformer",
+                                "Class": "sklearn.MinMaxScaler"
+                            }
                         }
                     },
                     "Instance": {
-                        "MOEA": {
-                            "Generations": 10,
-                            "PopulationSize": 70,
-                            "Algorithms": {
-                                "GWO": {
-                                    "MultiObjective": false
-                                },
-                                "DE": {
-                                    "MultiObjective": false
-                                },
-                                "SADE": {
-                                    "MultiObjective": false
-                                },
-                                "CMAES": {
-                                    "MultiObjective": false
-                                },
-                                "PSO_GEN": {
-                                    "MultiObjective": false
-                                }
-                            },
-                            "Type": "moea"
+                        "RandomSearch": {
+                            "SamplingSize": 1,
+                            "MultiObjective": true,
+                            "Type": "random_search"
                         }
                     }
                 },
                 "Optimizer_4": {
                     "ConfigurationTransformers": {
+                        "OrdinalTransformer": {
+                            "SklearnOrdinalEncoder": {
+                                "Type": "sklearn_ordinal_transformer",
+                                "Class": "sklearn.OrdinalEncoder"
+                            }
+                        },
                         "NominalTransformer": {
                             "SklearnBinaryEncoder": {
                                 "Type": "sklearn_binary_transformer",
                                 "Class": "sklearn.OrdinalEncoder"
                             }
+                        },
+                        "IntegerTransformer": {
+                            "SklearnIntMinMaxScaler": {
+                                "Type": "sklearn_integer_transformer",
+                                "Class": "sklearn.MinMaxScaler"
+                            }
                         }
                     },
                     "Instance": {
-                        "MOEA": {
-                            "Generations": 10,
-                            "PopulationSize": 70,
-                            "Algorithms": {
-                                "GWO": {
-                                    "MultiObjective": false
-                                },
-                                "DE": {
-                                    "MultiObjective": false
-                                },
-                                "SADE": {
-                                    "MultiObjective": false
-                                },
-                                "CMAES": {
-                                    "MultiObjective": false
-                                },
-                                "PSO_GEN": {
-                                    "MultiObjective": false
-                                }
-                            },
-                            "Type": "moea"
+                        "RandomSearch": {
+                            "SamplingSize": 1,
+                            "MultiObjective": true,
+                            "Type": "random_search"
                         }
                     }
                 }
@@ -421,11 +420,8 @@
                 "Type": "bad_configuration_based",
                 "Name": "SC1"
             },
-            "ImprovementBasedSC": {
-                "Parameters": {
-                    "MaxConfigsWithoutImprovement": 5
-                },
-                "Type": "improvement_based",
+            "GuaranteedSC": {
+                "Type": "guaranteed",
                 "Name": "SC2"
             },
             "QuantityBasedSC": {
@@ -434,18 +430,24 @@
                 },
                 "Type": "quantity_based",
                 "Name": "SC3"
-            },
-            "ValidationBasedSC": {
-                "Type": "validation_based",
-                "Name": "SC4"
             }
         },
         "StopConditionTriggerLogic": {
-            "Expression": "StopCondition1",
+            "Expression": "SC1 or SC2 or SC3",
             "InspectionParameters": {
                 "RepetitionPeriod": 5,
                 "TimeUnit": "seconds"
             }
+        }
+    },
+    "DistributionMode": {
+        "AsynchronousDistribution": {
+            "Type": "asynchronous_distribution"
+        }
+    },
+    "DefaultConfigurationHandler": {
+        "RandomDCH": {
+            "Type": "random_default_config_handler"
         }
     }
 }

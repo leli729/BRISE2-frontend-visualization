@@ -2,8 +2,8 @@
     "Context": {
         "TaskConfiguration": {
             "TaskName": "test",
-            "MaxTimeToRunTask": 0,
-            "TimeUnit": "seconds",
+            "MaxTimeToRunTask": 10,
+            "TimeUnit": "hours",
             "Scenario": {},
             "Objectives": {
                 "Y1": {
@@ -20,21 +20,11 @@
                 "N01": {
                     "F1": {
                         "Lower": 0.0,
-                        "Upper": 10.0,
-                        "Default": 0.0,
+                        "Upper": 123.0,
+                        "Default": 15.3,
                         "Type": "FloatHyperparameter",
                         "Level": 0
                     },
-                    "I1": {
-                        "Lower": 0,
-                        "Upper": 10,
-                        "Default": 0,
-                        "Type": "IntegerHyperparameter",
-                        "Level": 0
-                    },
-                    "Type": "Category"
-                },
-                "N02": {
                     "N1": {
                         "N11": {
                             "Type": "Category"
@@ -43,11 +33,21 @@
                             "Type": "Category"
                         },
                         "Categories": [
-                            "Context.SearchSpace.N0.N02.N1.N11",
-                            "Context.SearchSpace.N0.N02.N1.N12"
+                            "Context.SearchSpace.N0.N01.N1.N11",
+                            "Context.SearchSpace.N0.N01.N1.N12"
                         ],
-                        "Default": "Context.SearchSpace.N0.N02.N1.N11",
+                        "Default": "Context.SearchSpace.N0.N01.N1.N11",
                         "Type": "NominalHyperparameter",
+                        "Level": 0
+                    },
+                    "Type": "Category"
+                },
+                "N02": {
+                    "I1": {
+                        "Lower": 10,
+                        "Upper": 1000,
+                        "Default": 100,
+                        "Type": "IntegerHyperparameter",
                         "Level": 0
                     },
                     "O1": {
@@ -83,7 +83,7 @@
     "ConfigurationSelection": {
         "SamplingStrategy": {
             "MersenneTwister": {
-                "Seed": 3,
+                "Seed": 1,
                 "Type": "mersenne_twister"
             }
         },
@@ -125,26 +125,42 @@
                                 "Type": "sklearn_binary_transformer",
                                 "Class": "sklearn.OrdinalEncoder"
                             }
+                        },
+                        "IntegerTransformer": {
+                            "SklearnIntMinMaxScaler": {
+                                "Type": "sklearn_integer_transformer",
+                                "Class": "sklearn.MinMaxScaler"
+                            }
+                        },
+                        "FloatTransformer": {
+                            "SklearnFloatMinMaxScaler": {
+                                "Type": "sklearn_float_transformer",
+                                "Class": "sklearn.MinMaxScaler"
+                            }
+                        }
+                    },
+                    "ValueTransformers": {
+                        "ValueScalarizator": {
+                            "WeightedSum": {
+                                "Weights": [
+                                    1
+                                ],
+                                "Type": "weighted_sum"
+                            }
                         }
                     },
                     "Instance": {
                         "MOEA": {
-                            "Generations": 10,
-                            "PopulationSize": 72,
+                            "Generations": 2,
+                            "PopulationSize": 70,
                             "Algorithms": {
-                                "GWO": {
+                                "BEE_COLONY": {
                                     "MultiObjective": false
                                 },
                                 "SEA": {
                                     "MultiObjective": false
                                 },
-                                "SADE": {
-                                    "MultiObjective": false
-                                },
-                                "CMAES": {
-                                    "MultiObjective": false
-                                },
-                                "PSO": {
+                                "DE1220": {
                                     "MultiObjective": false
                                 },
                                 "PSO_GEN": {
@@ -157,25 +173,8 @@
                 },
                 "Validator": {
                     "ExternalValidator": {
-                        "QualityValidator": {
-                            "Split": {
-                                "KFold": {
-                                    "NumberOfFolds": 2
-                                }
-                            },
-                            "QualityThreshold": 1.0,
-                            "Type": "quality_validator"
-                        }
-                    },
-                    "InternalValidator": {
-                        "QualityValidator": {
-                            "Split": {
-                                "HoldOut": {
-                                    "TrainingSet": 0.9
-                                }
-                            },
-                            "QualityThreshold": 1.0,
-                            "Type": "quality_validator"
+                        "MockValidator": {
+                            "Type": "mock_validator"
                         }
                     }
                 },
@@ -191,48 +190,90 @@
     "RepetitionManager": {
         "MaxFailedTasksPerConfiguration": 3,
         "Instance": {
-            "AcceptableErrorBased": {
-                "MinTasksPerConfiguration": 2,
+            "QuantityBased": {
                 "MaxTasksPerConfiguration": 3,
-                "BaseAcceptableError": 1.0,
-                "ConfidenceLevel": 1.0,
-                "Type": "acceptable_error_based",
-                "ExperimentAware": {
-                    "MaxAcceptableError": 50.0,
-                    "RatioMax": 10.0,
-                    "MinTasksPerUnderperformingConfiguration": 1
-                }
+                "Type": "quantity_based"
             }
         }
     },
     "StopCondition": {
         "Instance": {
-            "BadConfigurationBasedSC": {
-                "Parameters": {
-                    "MaxBadConfigurations": 5
-                },
-                "Type": "bad_configuration_based",
+            "GuaranteedSC": {
+                "Type": "guaranteed",
                 "Name": "SC1"
             },
             "TimeBasedSC": {
                 "Parameters": {
                     "MaxRunTime": 10,
-                    "TimeUnit": "seconds"
+                    "TimeUnit": "hours"
                 },
                 "Type": "time_based",
                 "Name": "SC2"
-            },
-            "ValidationBasedSC": {
-                "Type": "validation_based",
-                "Name": "SC3"
             }
         },
         "StopConditionTriggerLogic": {
-            "Expression": "StopCondition1",
+            "Expression": "SC1 or SC2",
             "InspectionParameters": {
                 "RepetitionPeriod": 5,
-                "TimeUnit": "seconds"
+                "TimeUnit": "hours"
             }
+        }
+    },
+    "DistributionMode": {
+        "AsynchronousDistribution": {
+            "Type": "asynchronous_distribution"
+        }
+    },
+    "TransferLearning": {
+        "TransferExpediencyDetermination": {
+            "SamplingLandmarkBased": {
+                "MinNumberOfSamples": 5,
+                "Type": "sampling_landmark_based",
+                "Comparator": {
+                    "RGPE": {
+                        "Type": "rgpe_comparator"
+                    }
+                },
+                "ExperimentsQuantity": {
+                    "FixedQuantity": {
+                        "NumberOfSimilarExperiments": 3
+                    }
+                }
+            }
+        },
+        "ModelRecommendation": {
+            "DynamicModelsRecommendation": {
+                "RecommendationGranularity": {
+                    "Finite": {
+                        "Value": 5
+                    }
+                },
+                "PerformanceMetric": {
+                    "AverageRelativeImprovement": {
+                        "Type": "average_relative_improvement"
+                    }
+                },
+                "Type": "dynamic_model_recommendation",
+                "ThresholdType": "Soft",
+                "TimeToBuildModelThreshold": 10.0,
+                "TimeUnit": "hours"
+            }
+        },
+        "MultiTaskLearning": {
+            "Filters": {
+                "OldNewRatio": {
+                    "Type": "old_new_ratio",
+                    "OldNewConfigsRatio": 10.0
+                },
+                "OnlyBestConfigurations": {
+                    "Type": "only_best"
+                }
+            }
+        }
+    },
+    "DefaultConfigurationHandler": {
+        "RandomDCH": {
+            "Type": "random_default_config_handler"
         }
     }
 }

@@ -1,0 +1,264 @@
+{
+    "Context": {
+        "TaskConfiguration": {
+            "TaskName": "test",
+            "MaxTimeToRunTask": 10,
+            "TimeUnit": "hours",
+            "Scenario": {},
+            "Objectives": {
+                "Y1": {
+                    "Name": "Y1",
+                    "DataType": "float",
+                    "Minimization": true,
+                    "MinExpectedValue": 0,
+                    "MaxExpectedValue": 100
+                }
+            }
+        },
+        "SearchSpace": {
+            "F": {
+                "Lower": -100.5,
+                "Upper": 457.98,
+                "Default": -7.0,
+                "Type": "FloatHyperparameter",
+                "Level": 0
+            },
+            "N": {
+                "N1": {
+                    "Type": "Category"
+                },
+                "N2": {
+                    "Type": "Category"
+                },
+                "Categories": [
+                    "Context.SearchSpace.N.N1",
+                    "Context.SearchSpace.N.N2"
+                ],
+                "Default": "Context.SearchSpace.N.N1",
+                "Type": "NominalHyperparameter",
+                "Level": 0
+            },
+            "Structure": {
+                "Flat": {}
+            }
+        }
+    },
+    "ConfigurationSelection": {
+        "SamplingStrategy": {
+            "Sobol": {
+                "Seed": 1,
+                "Type": "sobol"
+            }
+        },
+        "Predictor": {
+            "WindowSize": 1.0,
+            "Model": {
+                "Surrogate": {
+                    "ConfigurationTransformers": {
+                        "OrdinalTransformer": {
+                            "SklearnOrdinalEncoder": {
+                                "Type": "sklearn_ordinal_transformer",
+                                "Class": "sklearn.OrdinalEncoder"
+                            }
+                        },
+                        "NominalTransformer": {
+                            "BinaryEncoder": {
+                                "Type": "binary_transformer",
+                                "Class": "brise.BinaryEncoder"
+                            }
+                        }
+                    },
+                    "ValueTransformers": {
+                        "ValueScalarizator": {
+                            "NormalizedWeightedSum": {
+                                "Weights": [
+                                    1
+                                ],
+                                "Type": "normalized_weighted_sum"
+                            }
+                        }
+                    },
+                    "Instance": {
+                        "LinearRegression": {
+                            "MultiObjective": false,
+                            "Type": "sklearn_model_wrapper",
+                            "Class": "sklearn.linear_model.LinearRegression"
+                        }
+                    }
+                },
+                "Optimizer": {
+                    "ConfigurationTransformers": {
+                        "OrdinalTransformer": {
+                            "SklearnOrdinalEncoder": {
+                                "Type": "sklearn_ordinal_transformer",
+                                "Class": "sklearn.OrdinalEncoder"
+                            }
+                        },
+                        "NominalTransformer": {
+                            "SklearnBinaryEncoder": {
+                                "Type": "sklearn_binary_transformer",
+                                "Class": "sklearn.OrdinalEncoder"
+                            }
+                        },
+                        "IntegerTransformer": {
+                            "SklearnIntMinMaxScaler": {
+                                "Type": "sklearn_integer_transformer",
+                                "Class": "sklearn.MinMaxScaler"
+                            }
+                        }
+                    },
+                    "Instance": {
+                        "MOEA": {
+                            "Generations": 2,
+                            "PopulationSize": 70,
+                            "Algorithms": {
+                                "GWO": {
+                                    "MultiObjective": false
+                                },
+                                "BEE_COLONY": {
+                                    "MultiObjective": false
+                                },
+                                "SGA": {
+                                    "MultiObjective": false
+                                },
+                                "SADE": {
+                                    "MultiObjective": false
+                                },
+                                "PSO": {
+                                    "MultiObjective": false
+                                }
+                            },
+                            "Type": "moea"
+                        }
+                    }
+                },
+                "Validator": {
+                    "ExternalValidator": {
+                        "QualityValidator": {
+                            "Split": {
+                                "HoldOut": {
+                                    "TrainingSet": 0.9
+                                }
+                            },
+                            "QualityThreshold": -1000000000.0,
+                            "Type": "quality_validator"
+                        }
+                    },
+                    "InternalValidator": {
+                        "QualityValidator": {
+                            "Split": {
+                                "HoldOut": {
+                                    "TrainingSet": 0.9
+                                }
+                            },
+                            "QualityThreshold": -1000000000.0,
+                            "Type": "quality_validator"
+                        }
+                    }
+                },
+                "CandidateSelector": {
+                    "BestMultiPointProposal": {
+                        "NumberOfPoints": 1,
+                        "Type": "best_multi_point"
+                    }
+                }
+            }
+        }
+    },
+    "RepetitionManager": {
+        "MaxFailedTasksPerConfiguration": 3,
+        "Instance": {
+            "QuantityBased": {
+                "MaxTasksPerConfiguration": 3,
+                "Type": "quantity_based"
+            }
+        }
+    },
+    "StopCondition": {
+        "Instance": {
+            "FewShotLearningBasedSC": {
+                "Type": "few_shot_learning_based",
+                "Name": "SC1"
+            },
+            "ImprovementBasedSC": {
+                "Parameters": {
+                    "MaxConfigsWithoutImprovement": 5
+                },
+                "Type": "improvement_based",
+                "Name": "SC2"
+            },
+            "QuantityBasedSC": {
+                "Parameters": {
+                    "MaxConfigs": 10
+                },
+                "Type": "quantity_based",
+                "Name": "SC3"
+            }
+        },
+        "StopConditionTriggerLogic": {
+            "Expression": "SC1 or SC2 or SC3",
+            "InspectionParameters": {
+                "RepetitionPeriod": 5,
+                "TimeUnit": "hours"
+            }
+        }
+    },
+    "DistributionMode": {
+        "AsynchronousDistribution": {
+            "Type": "asynchronous_distribution"
+        }
+    },
+    "TransferLearning": {
+        "TransferExpediencyDetermination": {
+            "SamplingLandmarkBased": {
+                "MinNumberOfSamples": 5,
+                "Type": "sampling_landmark_based",
+                "Comparator": {
+                    "NormDifference": {
+                        "Type": "norm_difference_comparator"
+                    }
+                },
+                "ExperimentsQuantity": {
+                    "AdaptiveQuantity": {
+                        "Clustering": {
+                            "MeanShift": {
+                                "Type": "mean_shift_clustering",
+                                "BandwidthType": "Fixed",
+                                "bandwidth": 0.0,
+                                "quantile": -1.0
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "ModelRecommendation": {
+            "DynamicModelsRecommendation": {
+                "RecommendationGranularity": {
+                    "Finite": {
+                        "Value": 5
+                    }
+                },
+                "PerformanceMetric": {
+                    "AverageRelativeImprovement": {
+                        "Type": "average_relative_improvement"
+                    }
+                },
+                "Type": "dynamic_model_recommendation",
+                "ThresholdType": "Hard",
+                "TimeToBuildModelThreshold": 10.0,
+                "TimeUnit": "hours"
+            }
+        },
+        "MultiTaskLearning": {
+            "Filters": {
+                "FewShotMultiTask": {
+                    "Type": "few_shot"
+                },
+                "OnlyBestConfigurations": {
+                    "Type": "only_best"
+                }
+            }
+        }
+    }
+}

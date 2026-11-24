@@ -2,8 +2,8 @@
     "Context": {
         "TaskConfiguration": {
             "TaskName": "test",
-            "MaxTimeToRunTask": 0,
-            "TimeUnit": "seconds",
+            "MaxTimeToRunTask": 10,
+            "TimeUnit": "days",
             "Scenario": {},
             "Objectives": {
                 "Y1": {
@@ -16,7 +16,7 @@
                 "Y2": {
                     "Name": "Y2",
                     "DataType": "float",
-                    "Minimization": true,
+                    "Minimization": false,
                     "MinExpectedValue": 0,
                     "MaxExpectedValue": 100
                 },
@@ -46,15 +46,15 @@
         "SearchSpace": {
             "X1": {
                 "Lower": 0.0,
-                "Upper": 10.0,
+                "Upper": 1.0,
                 "Default": 0.0,
                 "Type": "FloatHyperparameter",
                 "Level": 0
             },
             "X2": {
                 "Lower": 0.0,
-                "Upper": 10.0,
-                "Default": 0.0,
+                "Upper": 1.0,
+                "Default": 0.5,
                 "Type": "FloatHyperparameter",
                 "Level": 0
             },
@@ -66,7 +66,7 @@
     "ConfigurationSelection": {
         "SamplingStrategy": {
             "MersenneTwister": {
-                "Seed": 3,
+                "Seed": 1,
                 "Type": "mersenne_twister"
             }
         },
@@ -85,6 +85,12 @@
                                 "Type": "sklearn_binary_transformer",
                                 "Class": "sklearn.OrdinalEncoder"
                             }
+                        },
+                        "FloatTransformer": {
+                            "SklearnFloatMinMaxScaler": {
+                                "Type": "sklearn_float_transformer",
+                                "Class": "sklearn.MinMaxScaler"
+                            }
                         }
                     },
                     "Instance": {
@@ -101,26 +107,24 @@
                 },
                 "Optimizer": {
                     "ConfigurationTransformers": {
-                        "NominalTransformer": {
-                            "SklearnBinaryEncoder": {
-                                "Type": "sklearn_binary_transformer",
+                        "OrdinalTransformer": {
+                            "SklearnOrdinalEncoder": {
+                                "Type": "sklearn_ordinal_transformer",
                                 "Class": "sklearn.OrdinalEncoder"
+                            }
+                        },
+                        "IntegerTransformer": {
+                            "SklearnIntMinMaxScaler": {
+                                "Type": "sklearn_integer_transformer",
+                                "Class": "sklearn.MinMaxScaler"
                             }
                         }
                     },
                     "Instance": {
-                        "MOEA": {
-                            "Generations": 10,
-                            "PopulationSize": 70,
-                            "Algorithms": {
-                                "MOEAD": {
-                                    "MultiObjective": true
-                                },
-                                "MOEAD_GEN": {
-                                    "MultiObjective": true
-                                }
-                            },
-                            "Type": "moea"
+                        "RandomSearch": {
+                            "SamplingSize": 1,
+                            "MultiObjective": true,
+                            "Type": "random_search"
                         }
                     }
                 },
@@ -168,11 +172,16 @@
             }
         },
         "StopConditionTriggerLogic": {
-            "Expression": "StopCondition1",
+            "Expression": "SC1 or SC2 or SC3",
             "InspectionParameters": {
                 "RepetitionPeriod": 5,
-                "TimeUnit": "seconds"
+                "TimeUnit": "days"
             }
+        }
+    },
+    "DistributionMode": {
+        "AsynchronousDistribution": {
+            "Type": "asynchronous_distribution"
         }
     },
     "DefaultConfigurationHandler": {
