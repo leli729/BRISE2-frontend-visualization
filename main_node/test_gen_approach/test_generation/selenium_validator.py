@@ -1175,6 +1175,11 @@ class WaffleSeleniumValidator:
             # WFL: [if activation == "identity" then solver in {"lbfgs", "adam"}]
             if attr == "solver" and val == "sgd" and cfg.get_enum("activation") == "identity":
                 return "adam"
+            # FIXME: stub for the surrogate rework. The feature model doesn't forbid "relu" with "sgd", which diverges
+            # (sklearn's fit raises "Solver produced non-finite parameter weights") on a surrogate without a FloatTransformer.
+            # The rule belongs into the feature model; remove this branch then.
+            if attr == "activation" and val == "relu" and cfg.get_enum("solver") == "sgd":
+                return "tanh"
             return val
         # WFL: gamma equals "scale", "auto" or GammaFloat by GammaType; the bandit's c equals "std" or CFloat by CType
         if attr == "gamma" and cfg.get_enum("GammaType") == "float":

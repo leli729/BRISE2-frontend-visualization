@@ -141,7 +141,7 @@
                                 "hidden_layer_sizes": [
                                     100
                                 ],
-                                "activation": "relu",
+                                "activation": "tanh",
                                 "solver": "sgd",
                                 "alpha": 0.0
                             },
