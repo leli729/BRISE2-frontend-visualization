@@ -137,6 +137,9 @@ CONTEXT_REQUIRED_TRANSFORMERS: Dict[str, List[str]] = {
     "int-cat":    ["NominalTransformer", "OrdinalTransformer"],
 }
 
+# The contexts whose search space has an integer parameter (prefixes of the context names)
+INTEGER_CONTEXTS: tuple = ("all-types", "int-cat")
+
 # The search spaces of the sources the fixtures hold (the inputs of fill_db), per context and parameter, so that a
 # transfer-learning product can share its landmarks with a source. Int-cat's integers are large: in a space of 44
 # configurations the model's proposals are mostly evaluated already, and its source would never predict.
@@ -842,6 +845,12 @@ class WaffleSeleniumValidator:
         on |= self._get_required_transformers(cfg, owner)
         if owner == "Surrogate" and self._uses_surrogate("TreeParzenEstimator", cfg):
             on |= set(CONFIGURATION_TRANSFORMERS)
+        if owner == "Surrogate" and cfg.context_variant.startswith(INTEGER_CONTEXTS) \
+                and self._uses_surrogate("SupportVectorRegression", cfg) and cfg.get_enum("kernel") == "poly":
+            # FIXME: stub for the surrogate rework. The feature model lets a product with an integer parameter have no
+            # IntegerTransformer on its surrogate, and libsvm never converges on a poly kernel over unscaled integers
+            # (0..1000), so the surrogate's fit never returns. Remove this when the rework settles the rule.
+            on.add("IntegerTransformer")
         return {name for name in on if not self._is_conflicting(name, cfg, owner)}
 
     def _value_transformers_on(self, cfg: "PairwiseConfig", owner: str) -> set:

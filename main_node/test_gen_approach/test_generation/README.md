@@ -100,8 +100,8 @@ This metrics check wether the 100 valid configs together cover all feasible opti
 ### Group 7 Redundant configurations (RC)
 If an option pair has already appeared in one valid configuration, any further configurations containing the same pair is redundant from pairwise coverage.
 
-- **excess redundant ocurrences (RC): 38411**
-- **redundancy ratio (RR): 5.47** -> on average, each pair appears about 5.47 more often as necessary
+- **excess redundant ocurrences (RC): 38473**
+- **redundancy ratio (RR): 5.48** -> on average, each pair appears about 5.48 more often as necessary
 - **effeciency score: 0.09** -> only 9% of tuple-testing effort was productive. The other 91% are retested pairs that had already been seen, which is probably a consequence of of structural similarity
 
 A score of 1.0 would mean, that every pair is only covered by one configurations and appears in no other configuration again.
@@ -132,6 +132,6 @@ python3 quant_metrics.py
 | Jaccard max diversity | CD | 0.93 |
 | Feasible pairwise pairs (excl. infeasible/WFL_CONFLICTS) | — | 7025 |
 | Covered pairs | TO | 54.1% |
-| Excess tuple occurrences | RC | 38411 |
-| Redundancy ratio | RR | 5.47 |
+| Excess tuple occurrences | RC | 38473 |
+| Redundancy ratio | RR | 5.48 |
 | Efficiency score | — | 0.09 |
