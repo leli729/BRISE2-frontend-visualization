@@ -1,4 +1,5 @@
 import type { PlotlyInstance } from '../model/chart.types'
+import { categoryIndexOf } from '../model/category-index'
 import type { PointExp } from '../../../entities/main/model/plot.store'
 // import { ref } from 'vue'
 import type { ParameterSpec } from "../../../entities/experiment/model/experiment.model";
@@ -44,9 +45,10 @@ function factoryDimension(
             (value: unknown): value is number => typeof value === "number"
         );
 
+        // not Math.min(...numericValues): a call with a trial per argument overflows the stack
         dimension.range = [
-            Math.min(...numericValues),
-            Math.max(...numericValues)
+            numericValues.reduce((min: number, value: number) => Math.min(min, value), Infinity),
+            numericValues.reduce((max: number, value: number) => Math.max(max, value), -Infinity)
         ];
 
         if (spec && hasInactive) {
@@ -76,9 +78,8 @@ function factoryDimension(
             );
         }
 
-        dimension.values = values.map(
-            value => categories.indexOf(value)
-        );
+        const indexOfCategory = categoryIndexOf(categories);
+        dimension.values = values.map(indexOfCategory);
 
         dimension.tickvals = [
             ...(hasInactive ? [INACTIVE_INDEX] : []),
@@ -111,6 +112,7 @@ function dimensionsData(
     allRes: PointExp[],
     paraCoordParams: string[],
     paraCoordObjective: string,
+    objectiveValues: number[],
     specsByName: Record<string, ParameterSpec>
 ) {
     const dimensions = paraCoordParams.map(
@@ -120,10 +122,6 @@ function dimensionsData(
                 allRes,
                 specsByName
             )
-    );
-
-    const objectiveValues = allRes.map(
-        point => Number(point.results[paraCoordObjective])
     );
 
     dimensions.push({
@@ -168,6 +166,7 @@ export function renderParaCoord(
             allRes,
             paraCoordParams,
             paraCoordObjective,
+            objectiveValues,
             specsByName
         )
     }];

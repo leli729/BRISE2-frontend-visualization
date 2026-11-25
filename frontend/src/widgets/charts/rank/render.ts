@@ -1,3 +1,4 @@
+import { categoryIndexOf } from '../model/category-index'
 import type { Data, Layout } from 'plotly.js'
 import type { PlotlyInstance } from '../model/chart.types'
 import type { PointExp } from "../../../entities/main/model/plot.store";
@@ -34,7 +35,7 @@ function getParameterValues(
         const categories = spec.Categories;
 
         return {
-            values: values.map(value => categories.indexOf(value)),
+            values: values.map(categoryIndexOf(categories)),
             tickvals: [
                 ...inactiveTickvals,
                 ...categories.map((_: string, index: number) => index)
@@ -76,7 +77,7 @@ function getParameterValues(
     );
 
     return {
-        values: values.map(value => categories.indexOf(value)),
+        values: values.map(categoryIndexOf(categories)),
         tickvals: [
             ...inactiveTickvals,
             ...categories.map((_, index) => index)

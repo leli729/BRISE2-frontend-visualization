@@ -105,6 +105,24 @@ describe('renderParaCoord', () => {
         ])
     })
 
+    it('draws a numeric parameter of more trials than a call can take arguments', () => {
+        const element = document.createElement('div')
+        // a call with that many arguments overflows the stack: 110,000 did in the previous measurement
+        const trialCount = 250000
+        const trials: PointExp[] = Array.from({ length: trialCount }, (_, index) => ({
+            configurations: { frequency: index },
+            results: { runtime: trialCount - index },
+            time: '1m 0s',
+            'measured points': index + 1
+        }))
+
+        renderParaCoord(plotly, element, trials, ['frequency'], 'runtime', {})
+
+        expect(plotly.react).toHaveBeenCalledTimes(1)
+        const dimensions = (plotly.react.mock.calls[0][1] as any)[0].dimensions
+        expect(dimensions[0].range).toEqual([0, trialCount - 1])
+    })
+
     it('sets the correct layout', () => {
         const element = document.createElement('div')
 

@@ -69,7 +69,9 @@ export function renderHeatmap(
     const trialsOfCell = new Map<string, PointExp[]>()
     for (const trial of trials) {
         const key = `${labelOf(trial, param1)},${labelOf(trial, param2)}`
-        trialsOfCell.set(key, [...(trialsOfCell.get(key) ?? []), trial])
+        const trialsOfThisCell = trialsOfCell.get(key)
+        if (trialsOfThisCell) trialsOfThisCell.push(trial)
+        else trialsOfCell.set(key, [trial])
     }
     const means = new Map<string, number>()
     trialsOfCell.forEach((cell, key) =>
