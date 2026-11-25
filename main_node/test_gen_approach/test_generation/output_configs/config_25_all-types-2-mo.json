@@ -234,9 +234,6 @@
                             "Generations": 2,
                             "PopulationSize": 70,
                             "Algorithms": {
-                                "BEE_COLONY": {
-                                    "MultiObjective": false
-                                },
                                 "DE1220": {
                                     "MultiObjective": false
                                 },
@@ -290,9 +287,6 @@
                             "Generations": 2,
                             "PopulationSize": 70,
                             "Algorithms": {
-                                "BEE_COLONY": {
-                                    "MultiObjective": false
-                                },
                                 "DE1220": {
                                     "MultiObjective": false
                                 },

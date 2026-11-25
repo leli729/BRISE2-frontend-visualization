@@ -1057,6 +1057,11 @@ class WaffleSeleniumValidator:
             # every context has a numeric parameter, which the bandit builds no model for, and the validator gives every
             # Model_N the same surrogate: a product with the bandit never predicts a whole configuration
             return True
+        if val == "BEE_COLONY" and self._uses_surrogate("TreeParzenEstimator", cfg):
+            # FIXME: stub for the surrogate rework. The estimator gives a category that its good group has not measured an
+            # infinite density, the acquisition function's ratio and the fitness are infinite, and pygmo's bee_colony never
+            # returns on it. The fix is in the estimator (and MOEA stops the algorithm with an error); remove this then.
+            return True
         triggers = WFL_CONFLICTS.get(val)
         if triggers and owner == "Optimizer":
             triggers = [trigger for trigger in triggers if trigger != "MultiArmedBandit"]

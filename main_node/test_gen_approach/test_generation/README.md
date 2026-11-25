@@ -88,7 +88,7 @@ Telling us that pairwise sampling is strongly efficient sampling strategy for BR
 ### Group 5 Jaccard distance
 Jaccard distance tells us how similar all 100 valid configurations are, by the options each holds. A distance of 0 would mean that two configs hold exactly the same options while a distance of 1 means that two sets of options share no similarity. Too much similarity would mean that the test suite is pretty redundant.
 
-- **average distance: 0.45** means that the average pair of configs differ in about 45% of their options
+- **average distance: 0.46** means that the average pair of configs differ in about 46% of their options
 - **min distance: 0.00** means at least one pair of configs holds the same options (they differ in parameter values only)
 - **max distance: 0.93** means the most differing pair share only about 7% of their options
 
@@ -100,8 +100,8 @@ This metrics check wether the 100 valid configs together cover all feasible opti
 ### Group 7 Redundant configurations (RC)
 If an option pair has already appeared in one valid configuration, any further configurations containing the same pair is redundant from pairwise coverage.
 
-- **excess redundant ocurrences (RC): 38711**
-- **redundancy ratio (RR): 5.51** -> on average, each pair appears about 5.51 more often as necessary
+- **excess redundant ocurrences (RC): 38411**
+- **redundancy ratio (RR): 5.47** -> on average, each pair appears about 5.47 more often as necessary
 - **effeciency score: 0.09** -> only 9% of tuple-testing effort was productive. The other 91% are retested pairs that had already been seen, which is probably a consequence of of structural similarity
 
 A score of 1.0 would mean, that every pair is only covered by one configurations and appears in no other configuration again.
@@ -127,11 +127,11 @@ python3 quant_metrics.py
 | Options of the valid configs (excl. .None, enum attributes by place) | — | 120 |
 | Feature coverage of valid configs (excl. .None) | FC | 91.7% |
 | Uncovered features (excl. .None) | — | 10 |
-| Jaccard avg diversity | CD | 0.45 |
+| Jaccard avg diversity | CD | 0.46 |
 | Jaccard min diversity | CD | 0.00 |
 | Jaccard max diversity | CD | 0.93 |
 | Feasible pairwise pairs (excl. infeasible/WFL_CONFLICTS) | — | 7025 |
 | Covered pairs | TO | 54.1% |
-| Excess tuple occurrences | RC | 38711 |
-| Redundancy ratio | RR | 5.51 |
+| Excess tuple occurrences | RC | 38411 |
+| Redundancy ratio | RR | 5.47 |
 | Efficiency score | — | 0.09 |
