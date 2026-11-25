@@ -87,7 +87,7 @@ describe('HeatmapReg.vue', () => {
 
         eventCallbacks['FINAL']({
             headers: { message_subtype: 'configuration' },
-            body: JSON.stringify([{ configurations: { frequency: 'f1', threads: 't1' }, results: {}, measured_points: [] }])
+            body: [{ configurations: { frequency: 'f1', threads: 't1' }, results: {}, measured_points: [] }]
         })
         await flushPromises()
 
@@ -102,7 +102,7 @@ describe('HeatmapReg.vue', () => {
 
         eventCallbacks['FINAL']({
             headers: { message_subtype: 'configuration' },
-            body: JSON.stringify([{ configurations: { frequency: 'nonexistent', threads: 't1' }, results: {} }])
+            body: [{ configurations: { frequency: 'nonexistent', threads: 't1' }, results: {} }]
         })
         await flushPromises()
 
@@ -116,7 +116,7 @@ describe('HeatmapReg.vue', () => {
         await flushPromises()
 
         eventCallbacks['PREDICTIONS']({
-            body: JSON.stringify([{ configurations: { frequency: 'f1', threads: 't1' }, results: { energy: 100 } }])
+            body: [{ configurations: { frequency: 'f1', threads: 't1' }, results: { energy: 100 } }]
         })
         await flushPromises()
 
@@ -128,7 +128,7 @@ describe('HeatmapReg.vue', () => {
         await flushPromises()
 
         eventCallbacks['PREDICTIONS']({
-            body: JSON.stringify([{ configurations: { frequency: 'f1', threads: 't1' }, results: { energy: 100 } }])
+            body: [{ configurations: { frequency: 'f1', threads: 't1' }, results: { energy: 100 } }]
         })
         await flushPromises()
 

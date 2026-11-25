@@ -8,7 +8,8 @@ import { useMainEventStore, MainEvent } from '../../../../entities/main'
 import type { Solution } from '../../../../entities/task/model/task-data.model'
 import { DataTransformer } from '../../../../entities/experiment/lib/data.transformer'
 import { axisValues } from '../../../../entities/experiment/lib/search-space'
-import { cleanIdentifier, parseJsonWithInfinity } from '../../../../shared/lib'
+import { cleanIdentifier } from '../../../../shared/lib'
+// import { parseJsonWithInfinity } from '../../../../shared/lib' // the store parses each message once
 const store = useMainEventStore()
 const { experiment_description, regions, searchspaceReady, experimentFinished } = storeToRefs(store)
 
@@ -177,7 +178,8 @@ function initMainEvents() {
     subs.add(store.onEvent(MainEvent.PREDICTIONS)?.subscribe(async (message: any) => {
         if (experimentFinished.value) return
         console.log('[Heatmap Debug] PREDICTIONS event received', message)
-        const preds = parseJsonWithInfinity(message.body)
+        // the store parses each message once: const preds = parseJsonWithInfinity(message.body)
+        const preds = message.body
         for (const item of preds) {
             if (item && item.configurations) {
                 const rawXVal = item.configurations[xParamKey.value]
@@ -230,7 +232,8 @@ function initMainEvents() {
 
     subs.add(store.onEvent(MainEvent.FINAL)?.subscribe((message: any) => {
         if (message.headers['message_subtype'] === 'configuration') {
-            const configs = parseJsonWithInfinity(message.body)
+            // the store parses each message once: const configs = parseJsonWithInfinity(message.body)
+            const configs = message.body
             const res = configs?.[0]
             if (res) {
 

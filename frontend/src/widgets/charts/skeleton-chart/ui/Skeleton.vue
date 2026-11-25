@@ -9,7 +9,7 @@ import { MainEvent } from '../../../../entities/main'
 import { useMainEventStore } from '../../../../entities/main'
 import { usePlotStore } from '../../../../entities/main/model/plot.store'
 import type { PointExp } from '../../../../entities/main/model/plot.store'
-import { parseJsonWithInfinity, stringifyWithInfinity } from '../../../../shared/lib'
+import { stringifyWithInfinity } from '../../../../shared/lib'
 
 defineOptions({ name: 'SkeletonChart' })
 
@@ -67,7 +67,7 @@ function initMainEvents() {
     subs.add(store.onEvent(MainEvent.DEFAULT)?.subscribe((message: any) => {
         if (experimentFinished.value) return
         if (message.headers['message_subtype'] === 'configuration') {
-            const configs = parseJsonWithInfinity(message.body)
+            const configs = message.body
             configs.forEach((configuration: any) => {
                 const min = new Date().getMinutes();
                 const sec = new Date().getSeconds();
@@ -85,7 +85,7 @@ function initMainEvents() {
     // add last point
     subs.add(store.onEvent(MainEvent.FINAL)?.subscribe((message: any) => {
         if (message.headers['message_subtype'] === 'configuration') {
-            const configs = parseJsonWithInfinity(message.body);
+            const configs = message.body;
             configs.forEach((configuration: any) => {
                 // the solution is usually one of the measured configurations: don't count it twice
                 const measuredPoint = findMatchingPoint(configuration)
@@ -111,7 +111,7 @@ function initMainEvents() {
     subs.add(store.onEvent(MainEvent.NEW)?.subscribe((message: any) => {
         if (experimentFinished.value) return
         if (message.headers['message_subtype'] === 'configuration') {
-            const configs = parseJsonWithInfinity(message.body);
+            const configs = message.body;
 
             // check the best availbale point
             const descr = experiment_description.value

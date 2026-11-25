@@ -1,9 +1,11 @@
 import { computed, ref, shallowRef } from 'vue'
 import { defineStore } from 'pinia'
 import { MainEvent } from './main.types'
+import type { ParsedMessage } from './main.types'
 import { stompClient } from '../../../shared/api/stomp.client'
 import type { ExperimentDescription, ParameterSpec, RawProductConfiguration, SearchSpaceRegion } from '../../experiment/model/experiment.model'
 import type { IMessage } from '@stomp/stompjs'
+import { EMPTY, mergeMap, of, share } from 'rxjs'
 import type { Observable } from 'rxjs'
 import { parseJsonWithInfinity } from '../../../shared/lib'
 
@@ -33,17 +35,33 @@ export const useMainEventStore = defineStore('mainEvent', () => {
    const searchspaceReady = ref(false)
    const experimentFinished = ref(false)
    const plotlyInstance = shallowRef<any>(null)
-   const listeners: Record<string, Observable<IMessage>> = {
-      [MainEvent.EXPERIMENT]: stompClient.watch('front_experiment_queue', { 'x-message-ttl': '1000' }),
-      [MainEvent.FINAL]: stompClient.watch('front_final_queue', { 'x-message-ttl': '1000' }),
-      [MainEvent.DEFAULT]: stompClient.watch('front_default_queue', { 'x-message-ttl': '1000' }),
-      [MainEvent.NEW]: stompClient.watch('front_new_queue', { 'x-message-ttl': '1000' }),
-      [MainEvent.PREDICTIONS]: stompClient.watch('front_predictions_queue', { 'x-message-ttl': '1000' }),
-      [MainEvent.LOG]: stompClient.watch('front_log_queue', { 'x-message-ttl': '1000' })
-
+   // the messages of a queue with their bodies parsed, the only place that parses them. The raw Infinity/-Infinity/NaN
+   // tokens of main-node, which are not valid JSON, become the real values. A body that does not parse is reported and
+   // skipped: an error would end the stream for every subscriber of the queue.
+   function parsedMessages(queue: string): Observable<ParsedMessage> {
+      return stompClient.watch(queue, { 'x-message-ttl': '1000' }).pipe(
+         mergeMap((message: IMessage) => {
+            try {
+               return of({ headers: message.headers, body: parseJsonWithInfinity(message.body) })
+            } catch (error) {
+               console.error(`a message of ${queue} does not parse and is skipped:`, error)
+               return EMPTY
+            }
+         }),
+         share()
+      )
    }
 
-   function onEvent(event: MainEvent): Observable<IMessage> | undefined {
+   const listeners: Record<string, Observable<ParsedMessage>> = {
+      [MainEvent.EXPERIMENT]: parsedMessages('front_experiment_queue'),
+      [MainEvent.FINAL]: parsedMessages('front_final_queue'),
+      [MainEvent.DEFAULT]: parsedMessages('front_default_queue'),
+      [MainEvent.NEW]: parsedMessages('front_new_queue'),
+      [MainEvent.PREDICTIONS]: parsedMessages('front_predictions_queue'),
+      [MainEvent.LOG]: parsedMessages('front_log_queue')
+   }
+
+   function onEvent(event: MainEvent): Observable<ParsedMessage> | undefined {
       return listeners[String(event)]
    }
 
@@ -82,12 +100,11 @@ export const useMainEventStore = defineStore('mainEvent', () => {
    // starts the subsription to Experiment event
    function initEvent() {
       console.log('initEvent called, subscribing to EXPERIMENT queue')
-      onEvent(MainEvent.EXPERIMENT)?.subscribe((message: any) => {
+      onEvent(MainEvent.EXPERIMENT)?.subscribe((message) => {
          console.log('EXPERIMENT message received:', message.headers['message_subtype'])
          if (message.headers['message_subtype'] === 'description') {
             console.log(message.body)
-            // cleans invalid json parts (raw Infinity/-Infinity tokens) while preserving the real value
-            const body = parseJsonWithInfinity(message.body) as { experiment_description: ExperimentDescription, regions?: SearchSpaceRegion[] }
+            const body = message.body as { experiment_description: ExperimentDescription, regions?: SearchSpaceRegion[] }
             console.log('after the setting', experiment_description.value?.Context?.TaskConfiguration?.TaskName)
             experiment_description.value = body.experiment_description
             // regions are always an array, and the search space is ready only once they have arrived
@@ -104,7 +121,7 @@ export const useMainEventStore = defineStore('mainEvent', () => {
          }
       })
 
-      onEvent(MainEvent.FINAL)?.subscribe((message: any) => {
+      onEvent(MainEvent.FINAL)?.subscribe((message) => {
          if (message.headers['message_subtype'] === 'configuration') {
             experimentFinished.value = true
          }

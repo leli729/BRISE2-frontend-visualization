@@ -10,7 +10,7 @@ import { useMainEventStore } from '../../../entities/main'
 import { Subscription } from 'rxjs'
 
 import { useInfoBoard } from '../model/use-info-board'
-import { normalizeConfigKeys, parseJsonWithInfinity, stringifyWithInfinity } from '../../../shared/lib'
+import { normalizeConfigKeys, stringifyWithInfinity } from '../../../shared/lib'
 // initialize store
 const store = useMainEventStore()
 // destructure reactive value from main.event.store
@@ -52,7 +52,7 @@ function initMainEvents(): void {
   // Main events
   subscriptions.add(store.onEvent(MainEvent.DEFAULT)?.subscribe((message: any) => {
     if (message.headers['message_subtype'] === 'configuration') {
-      let obj = parseJsonWithInfinity(message.body)
+      let obj = message.body
 
       default_configuration.value = obj[0]
       let temp = { 'time': Date.now(), 'message': 'Default configuration results received' }
@@ -68,7 +68,7 @@ function initMainEvents(): void {
 
   subscriptions.add(store.onEvent(MainEvent.FINAL)?.subscribe((message: any) => {
     if (message.headers['message_subtype'] === 'configuration') {
-      let obj = parseJsonWithInfinity(message.body)
+      let obj = message.body
       const s = obj[0]
       const cleanConfigObj = normalizeConfigKeys(s?.configurations ?? {})
       const config = stringifyWithInfinity(cleanConfigObj, 2)
@@ -102,7 +102,7 @@ function initMainEvents(): void {
   // For information messages
   subscriptions.add(store.onEvent(MainEvent.LOG)?.subscribe((message: any) => {
     if (message.headers['message_subtype'] === 'info' || message.headers['message_subtype'] === 'error') {
-      let obj = parseJsonWithInfinity(message.body)
+      let obj = message.body
       let temp = { 'time': Date.now(), 'message': obj }
       triggerSnackbar(temp.message)
       pushNews(temp.message)
@@ -130,7 +130,7 @@ function initMainEvents(): void {
   subscriptions.add(store.onEvent(MainEvent.NEW)?.subscribe((message: any) => {
     if (experimentFinished.value) return
     if (message.headers['message_subtype'] === 'configuration') {
-      let configs = parseJsonWithInfinity(message.body)
+      let configs = message.body
       configs.forEach((configuration: any) => {
         if (configuration?.configurations) {
           const cleanConfig = normalizeConfigKeys(configuration.configurations)
@@ -154,7 +154,7 @@ function initMainEvents(): void {
   subscriptions.add(store.onEvent(MainEvent.PREDICTIONS)?.subscribe((message: any) => {
     if (experimentFinished.value) return
     if (message.headers['message_subtype'] === 'configurations') {
-      let obj = parseJsonWithInfinity(message.body)
+      let obj = message.body
       let temp = {
         'time': Date.now(),
         'message': 'Prediction obtained. ' + obj.length + ' predictions'

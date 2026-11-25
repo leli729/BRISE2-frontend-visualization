@@ -1,3 +1,5 @@
+import type { StompHeaders } from '@stomp/stompjs'
+
 export const MainEvent = {
     CONNECT: 'connect',
     DISCONNECT: 'disconnect',
@@ -20,4 +22,8 @@ export const SubEvent = {
     LOG: ['info', 'debug', 'critical']
 }
 
-
+// a message of the event service with its body parsed (the store parses each message once)
+export interface ParsedMessage {
+    headers: StompHeaders
+    body: any
+}

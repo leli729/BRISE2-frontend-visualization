@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { of, BehaviorSubject, Subject } from 'rxjs'
 import { MainEvent } from '../entities/main/model/main.types'
@@ -189,6 +189,10 @@ describe('useMainEventStore', () => {
             vi.spyOn(console, 'error').mockImplementation(() => {})
         })
 
+        afterEach(() => {
+            vi.restoreAllMocks()
+        })
+
         it('should keep the description, report the problem and leave the search space not ready', () => {
             mockWatch.mockReturnValue(of(descriptionMessage(undefined)))
 
@@ -274,5 +278,85 @@ describe('useMainEventStore', () => {
         store.initEvent()
 
         expect(store.experiment_description).toEqual({ value })
+    })
+
+    describe('the events handed to the widgets', () => {
+        afterEach(() => {
+            vi.restoreAllMocks()
+        })
+
+        const collect = (store: ReturnType<typeof useMainEventStore>, event: MainEvent) => {
+            const received: any[] = []
+            store.onEvent(event)?.subscribe(message => received.push(message))
+            return received
+        }
+
+        it('should hand out the parsed body with the headers of the message', () => {
+            const messages = new Subject<any>()
+            mockWatch.mockReturnValue(messages)
+
+            const store = useMainEventStore()
+            const received = collect(store, MainEvent.NEW)
+            messages.next({ headers: { message_subtype: 'configuration' }, body: '[{"configurations": {"x": 1}}]' })
+
+            expect(received).toEqual([{ headers: { message_subtype: 'configuration' }, body: [{ configurations: { x: 1 } }] }])
+        })
+
+        it('should hand every subscriber of an event the same parsed body', () => {
+            const messages = new Subject<any>()
+            mockWatch.mockReturnValue(messages)
+
+            const store = useMainEventStore()
+            const first = collect(store, MainEvent.NEW)
+            const second = collect(store, MainEvent.NEW)
+            messages.next({ headers: {}, body: '[{"configurations": {"x": 1}}]' })
+
+            expect(first).toHaveLength(1)
+            expect(first[0].body).toEqual([{ configurations: { x: 1 } }])
+            expect(second[0].body).toBe(first[0].body)
+        })
+
+        it('should skip a message that does not parse, report it and go on with the next one for every subscriber', () => {
+            vi.spyOn(console, 'error').mockImplementation(() => {})
+            const messages = new Subject<any>()
+            mockWatch.mockReturnValue(messages)
+
+            const store = useMainEventStore()
+            const first = collect(store, MainEvent.NEW)
+            const second = collect(store, MainEvent.NEW)
+            messages.next({ headers: {}, body: 'not json' })
+            messages.next({ headers: {}, body: '[1]' })
+
+            expect(console.error).toHaveBeenCalled()
+            expect(first.map(message => message.body)).toEqual([[1]])
+            expect(second.map(message => message.body)).toEqual([[1]])
+        })
+
+        it('should hand the next message to a widget that subscribes again after all others left', () => {
+            const messages = new Subject<any>()
+            mockWatch.mockReturnValue(messages)
+
+            const store = useMainEventStore()
+            store.onEvent(MainEvent.NEW)?.subscribe(() => {}).unsubscribe()
+            const again = collect(store, MainEvent.NEW)
+            messages.next({ headers: {}, body: '[1]' })
+
+            expect(again.map(message => message.body)).toEqual([[1]])
+        })
+
+        it.each([
+            ['Infinity', Infinity],
+            ['-Infinity', -Infinity],
+            ['NaN', NaN]
+        ])('should restore %s in the parsed body', (token, value) => {
+            const messages = new Subject<any>()
+            mockWatch.mockReturnValue(messages)
+
+            const store = useMainEventStore()
+            const received = collect(store, MainEvent.NEW)
+            messages.next({ headers: {}, body: `[{"results": {"x": ${token}}}]` })
+
+            expect(received[0].body).toEqual([{ results: { x: value } }])
+        })
     })
 })

@@ -46,7 +46,7 @@ const mountComponent = (): any => mount(TaskList, {
 })
 
 function makeTaskPayload(id: string, configValue = 'foo') {
-    return JSON.stringify([{
+    return [{
         run: { method: 'someMethod', param: {} },
         configurations: { 'Context.SearchSpace.N': configValue },
         results: {
@@ -55,27 +55,27 @@ function makeTaskPayload(id: string, configValue = 'foo') {
             receive: 1,
             result: { x: 1 }
         }
-    }])
+    }]
 }
 
 function makeConfigurationPayload(configValue: string, resultValue: number) {
-    return JSON.stringify([{
+    return [{
         configurations: { 'Context.SearchSpace.N': configValue },
         results: { x: resultValue }
-    }])
+    }]
 }
 
 function makeNaNTaskPayload(id: string, resultValue: number) {
-    return `[{
-        "run": {"method": "someMethod", "param": {}},
-        "configurations": {"Context.SearchSpace.N": NaN},
-        "results": {
-            "task id": "${id}",
-            "owner": "tester",
-            "receive": 1,
-            "result": {"x": ${resultValue}}
+    return [{
+        run: { method: 'someMethod', param: {} },
+        configurations: { 'Context.SearchSpace.N': NaN },
+        results: {
+            'task id': id,
+            owner: 'tester',
+            receive: 1,
+            result: { x: resultValue }
         }
-    }]`
+    }]
 }
 
 describe('TaskList.vue', () => {

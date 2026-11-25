@@ -130,7 +130,7 @@ describe('Skeleton.vue', () => {
             headers: {
                 message_subtype: 'configuration'
             },
-            body: JSON.stringify([
+            body: [
                 {
                     configurations: {
                         frequency: 50,
@@ -138,7 +138,7 @@ describe('Skeleton.vue', () => {
                     },
                     results: [123.4]
                 }
-            ])
+            ]
         })
 
         await flushPromises()
@@ -167,7 +167,7 @@ describe('Skeleton.vue', () => {
             headers: {
                 message_subtype: 'configuration'
             },
-            body: JSON.stringify([
+            body: [
                 {
                     configurations: {
                         frequency: 50,
@@ -175,7 +175,7 @@ describe('Skeleton.vue', () => {
                     },
                     results: [123.4]
                 }
-            ])
+            ]
         })
 
         await flushPromises()
@@ -204,7 +204,7 @@ describe('Skeleton.vue', () => {
             headers: {
                 message_subtype: 'configuration'
             },
-            body: JSON.stringify([
+            body: [
                 {
                     configurations: {
                         frequency: 50,
@@ -212,7 +212,7 @@ describe('Skeleton.vue', () => {
                     },
                     results: [123.4]
                 }
-            ])
+            ]
         })
 
         await flushPromises()
@@ -364,7 +364,7 @@ describe('Skeleton.vue', () => {
             headers: {
                 message_subtype: 'configuration'
             },
-            body: JSON.stringify([configuration])
+            body: [configuration]
         })
 
         await flushPromises()
@@ -374,7 +374,7 @@ describe('Skeleton.vue', () => {
             headers: {
                 message_subtype: 'configuration'
             },
-            body: JSON.stringify([configuration])
+            body: [configuration]
         })
 
         await flushPromises()
@@ -403,14 +403,14 @@ describe('Skeleton.vue', () => {
             headers: {
                 message_subtype: 'configuration'
             },
-            body: JSON.stringify([configuration])
+            body: [configuration]
         })
 
         eventCallbacks['NEW']({
             headers: {
                 message_subtype: 'configuration'
             },
-            body: JSON.stringify([configuration])
+            body: [configuration]
         })
 
         await flushPromises()

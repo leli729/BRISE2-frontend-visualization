@@ -95,7 +95,7 @@ describe('InfoBoard.vue', () => {
 
         const mockLogMessage = {
             headers: { message_subtype: 'info' },
-            body: JSON.stringify('Server connection is successfully set')
+            body: 'Server connection is successfully set'
         }
 
         eventCallbacks['LOG'](mockLogMessage)
@@ -116,7 +116,7 @@ describe('InfoBoard.vue', () => {
         for (let i = 1; i <= 35; i++) {
             eventCallbacks['LOG']({
                 headers: { message_subtype: 'info' },
-                body: JSON.stringify(`message ${i}`)
+                body: `message ${i}`
             })
         }
         await flushPromises()
@@ -137,11 +137,11 @@ describe('InfoBoard.vue', () => {
 
         const mockFinalMessage = {
             headers: { message_subtype: 'configuration' },
-            body: JSON.stringify([{
+            body: [{
                 configurations: { param1: 'value1' },
                 results: [10],
                 performed_measurements: 5
-            }])
+            }]
         }
 
         eventCallbacks['FINAL'](mockFinalMessage)
@@ -158,10 +158,10 @@ describe('InfoBoard.vue', () => {
 
         eventCallbacks['NEW']({
             headers: { message_subtype: 'configuration' },
-            body: JSON.stringify([{
+            body: [{
                 configurations: { param1: 'value1' },
                 results: { metric: 1 }
-            }])
+            }]
         })
         await flushPromises()
 
@@ -176,7 +176,7 @@ describe('InfoBoard.vue', () => {
 
         eventCallbacks['LOG']({
             headers: { message_subtype: 'info' },
-            body: JSON.stringify('late log message')
+            body: 'late log message'
         })
         await flushPromises()
 
