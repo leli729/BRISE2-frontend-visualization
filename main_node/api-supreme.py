@@ -40,19 +40,9 @@ class ConsumerThread(Thread):
         self.connection = pika.BlockingConnection(pika.ConnectionParameters(host=self._host, port=self._port))
         self._is_interrupted = False
         self.channel = self.connection.channel()
-        self.channel.queue_declare(queue="main_plot_queue", durable=True)
         self.channel.basic_qos(prefetch_count=1)
         self.MAIN_THREAD: MainThread = MainThread()
         self.logger = BRISELogConfigurator().get_logger(__name__)
-
-        self.plot_service = PlotService()
-
-        self.plot_handlers = {
-            "hyperparameter_importances": self.plot_service.calculate_importances,
-            "pareto_front": self.plot_service.calculate_pareto,
-            "contour": self.plot_service.calculate_contour
-        }
-       
 
     def main_process_status(self):
         """
@@ -189,9 +179,7 @@ class ConsumerThread(Thread):
                                    on_message_callback=self.main_stop)
         self.channel.basic_consume(queue='main_download_dump_queue', auto_ack=False,
                                    on_message_callback=self.download_dump_request_queue)
-        self.channel.basic_consume(queue='main_plot_queue', auto_ack=False,
-                                   on_message_callback=self.plot_callback)
-       
+
         try:
             while self.channel._consumer_infos:
                 self.channel.connection.process_data_events(time_limit=1)  # 1 second
@@ -205,7 +193,62 @@ class ConsumerThread(Thread):
 
     def stop(self):
         self._is_interrupted = True
-        
+
+
+class PlotConsumerThread(Thread):
+    """
+    This class runs in a separate thread, on a connection of its own, and answers the plot requests of the front-end
+    from the `main_plot_queue`. A plot takes up to a second to compute, so it must not hold up the requests of
+    `ConsumerThread` (start, status, stop, download dump), which run in another thread.
+    """
+
+    def __init__(self, host, port, consumer_thread, *args, **kwargs):
+        """
+        :param consumer_thread: the ConsumerThread whose MAIN_THREAD holds the experiment to plot; it is read on each
+                                request, as every start replaces it
+        """
+        super(PlotConsumerThread, self).__init__(*args, **kwargs)
+
+        self._host = host
+        self._port = port
+        self.connection = pika.BlockingConnection(pika.ConnectionParameters(host=self._host, port=self._port))
+        self._is_interrupted = False
+        self.channel = self.connection.channel()
+        self.channel.queue_declare(queue="main_plot_queue", durable=True)
+        self.channel.basic_qos(prefetch_count=1)
+        self.consumer_thread = consumer_thread
+        self.logger = BRISELogConfigurator().get_logger(__name__)
+
+        self.plot_service = PlotService()
+
+        self.plot_handlers = {
+            "hyperparameter_importances": self.plot_service.calculate_importances,
+            "pareto_front": self.plot_service.calculate_pareto,
+            "contour": self.plot_service.calculate_contour
+        }
+
+    def run(self):
+        """
+        Point of entry to the server part of PRC,
+        listening of the queue with the plot requests
+        """
+        self.channel.basic_consume(queue='main_plot_queue', auto_ack=False,
+                                   on_message_callback=self.plot_callback)
+
+        try:
+            while self.channel._consumer_infos:
+                self.channel.connection.process_data_events(time_limit=1)  # 1 second
+                if self._is_interrupted:
+                    if self.connection.is_open:
+                        self.connection.close()
+                    break
+        finally:
+            if self.connection.is_open:
+                self.connection.close()
+
+    def stop(self):
+        self._is_interrupted = True
+
     # call plot_service.PlotService
     def plot_callback(self, ch, method, props, body):
         request = json.loads(body)
@@ -215,11 +258,10 @@ class ConsumerThread(Thread):
             handler = self.plot_handlers[plot]
             # the experiment is kept after it has finished, so its plots can still be requested; there is none before
             # the first start, which fails the handler and replies with the empty result
-            result = handler(request["payload"], self.MAIN_THREAD.experiment)
+            result = handler(request["payload"], self.consumer_thread.MAIN_THREAD.experiment)
         except Exception:
-            # A bad plot request must not take down this consumer thread - it also serves
-            # start/status/stop/download-dump. Reply with the same "no data" shape each chart
-            # already renders as empty, so the frontend's promise still resolves.
+            # A bad plot request must not take down this consumer thread. Reply with the same "no data" shape each
+            # chart already renders as empty, so the frontend's promise still resolves.
             self.logger.exception(f"plot_callback failed for plot '{plot}'")
             result = EMPTY_PLOT_RESULTS.get(plot, {})
 
@@ -238,5 +280,9 @@ class ConsumerThread(Thread):
 
 if __name__ == '__main__':
     consumer_thread = ConsumerThread(os.getenv("BRISE_EVENT_SERVICE_HOST"), os.getenv("BRISE_EVENT_SERVICE_AMQP_PORT"))
+    plot_consumer_thread = PlotConsumerThread(os.getenv("BRISE_EVENT_SERVICE_HOST"),
+                                              os.getenv("BRISE_EVENT_SERVICE_AMQP_PORT"), consumer_thread)
     consumer_thread.start()
+    plot_consumer_thread.start()
     consumer_thread.join()
+    plot_consumer_thread.join()

@@ -1,4 +1,6 @@
-import optuna 
+import optuna
+# imported here for performance reasons
+import optuna.importance
 import plotly
 import numpy as np
 import scipy.sparse
