@@ -1,7 +1,7 @@
 import { mount, flushPromises } from '@vue/test-utils'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
-import { ref } from 'vue'
+import { ref, shallowRef, watch } from 'vue'
 import { Skeleton } from '../../widgets/charts/skeleton-chart'
 import type { PointExp } from '../../entities/main/model/plot.store'
 import type { ExperimentDescription } from '../../entities/experiment/model/experiment.model'
@@ -62,7 +62,8 @@ const mockStore = {
 }
 
 const mockPlotStore = {
-    allRes: ref<PointExp[]>([]),
+    // shallow, as in the store: a change is the assignment of a new array
+    allRes: shallowRef<PointExp[]>([]),
     selected: ref<Record<string, boolean>>({}),
     visibleCharts: ref<string[]>([]),
     solution: ref<PointExp | null>(null)
@@ -190,6 +191,32 @@ describe('Skeleton.vue', () => {
                 time: expect.any(String),
                 'measured points': 1
             }
+        ])
+    })
+
+    // FINAL is given a solution that is not among the measured points, so it adds one
+    it.each(['DEFAULT', 'NEW', 'FINAL'])('stores the configurations of one %s message with one change of allRes, to a new array', async (eventType) => {
+        mount(Skeleton)
+        await flushPromises()
+        const before = mockPlotStore.allRes.value
+        const changes: PointExp[][] = []
+        const stopWatching = watch(mockPlotStore.allRes, value => { changes.push(value) })
+
+        eventCallbacks[eventType]({
+            headers: { message_subtype: 'configuration' },
+            body: [
+                { configurations: { frequency: 50, threads: 4 }, results: { runtime: 1 } },
+                { configurations: { frequency: 60, threads: 8 }, results: { runtime: 2 } }
+            ]
+        })
+        await flushPromises()
+        stopWatching()
+
+        expect(changes).toHaveLength(1)
+        expect(changes[0]).not.toBe(before)
+        expect(changes[0].map(point => point.configurations)).toEqual([
+            { frequency: 50, threads: 4 },
+            { frequency: 60, threads: 8 }
         ])
     })
 

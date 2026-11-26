@@ -1,7 +1,8 @@
-import { mount, flushPromises } from '@vue/test-utils'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { mount } from '@vue/test-utils'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { settle } from './chartTiming'
 import { createPinia, setActivePinia } from 'pinia'
-import { ref } from 'vue'
+import { ref, shallowRef } from 'vue'
 import { OptHist } from '../../widgets/charts/opt-hist'
 import type { PointExp } from '../../entities/main/model/plot.store'
 
@@ -9,7 +10,7 @@ const { renderOptHistMock } = vi.hoisted(() => ({
     renderOptHistMock: vi.fn()
 }))
 
-const allRes = ref<any[]>([])
+const allRes = shallowRef<any[]>([])
 const solution = ref<PointExp | null>(null)
 
 const experiment_description = ref({
@@ -50,8 +51,8 @@ vi.mock('../../widgets/charts/opt-hist/render', () => ({
 }))
 
 describe('Optimization History', () => {
-
     beforeEach(() => {
+        vi.useFakeTimers()
         setActivePinia(createPinia())
 
         vi.clearAllMocks()
@@ -77,6 +78,10 @@ describe('Optimization History', () => {
         }
     })
 
+    afterEach(() => {
+        vi.useRealTimers()
+    })
+
    const mountComponent = () => {
         return mount(OptHist, {
             props: {
@@ -91,11 +96,11 @@ describe('Optimization History', () => {
     it('rerenders when allRes changes', async () => {
         mountComponent()
 
-        await flushPromises()
+        await settle()
 
         const callsBeforeChange = renderOptHistMock.mock.calls.length
 
-        allRes.value.push({
+        allRes.value = [...allRes.value, {
             configurations: {
                 frequency: 60,
                 threads: 8
@@ -103,9 +108,9 @@ describe('Optimization History', () => {
             results: {
                 runtime: 100
             }
-        })
+        }]
 
-        await flushPromises()
+        await settle()
 
         expect(renderOptHistMock.mock.calls.length)
             .toBeGreaterThan(callsBeforeChange)
@@ -114,7 +119,7 @@ describe('Optimization History', () => {
     it('rerenders when optHistObjective changes', async () => {
         const wrapper = mountComponent()
 
-        await flushPromises()
+        await settle()
 
         const callsBeforeChange = renderOptHistMock.mock.calls.length
 
@@ -122,7 +127,7 @@ describe('Optimization History', () => {
             optHistObjective: 'energy'
         })
 
-        await flushPromises()
+        await settle()
 
         expect(renderOptHistMock.mock.calls.length)
             .toBeGreaterThan(callsBeforeChange)
@@ -131,7 +136,7 @@ describe('Optimization History', () => {
     it('purges the chart when it is unmounted', async () => {
         const wrapper = mountComponent()
 
-        await flushPromises()
+        await settle()
 
         const element = wrapper.find('div').element
 

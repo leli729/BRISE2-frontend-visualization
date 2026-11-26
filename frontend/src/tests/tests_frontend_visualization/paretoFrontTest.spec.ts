@@ -1,7 +1,8 @@
-import { mount, flushPromises } from '@vue/test-utils'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { mount, enableAutoUnmount } from '@vue/test-utils'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { settle } from './chartTiming'
 import { createPinia, setActivePinia } from 'pinia'
-import { ref } from 'vue'
+import { ref, shallowRef } from 'vue'
 import { ParetoFront } from '../../widgets/charts/pareto-front'
 
 const result = {
@@ -32,7 +33,7 @@ const { renderParetoFrontMock } = vi.hoisted(() => ({
     renderParetoFrontMock: vi.fn()
 }))
 
-const allRes = ref<any[]>([])
+const allRes = shallowRef<any[]>([])
 
 const plotlyInstance = ref({ react: vi.fn(), purge: vi.fn() })
 
@@ -60,15 +61,23 @@ vi.mock('../../widgets/charts/pareto-front/render', () => ({
 
 
 
-describe('Pareto Front', () => {
+// every mounted chart watches the module-level refs below until it is unmounted; a leftover one would draw with
+// its old props when a later test changes them
+enableAutoUnmount(afterEach)
 
+describe('Pareto Front', () => {
     beforeEach(() => {
+        vi.useFakeTimers()
         setActivePinia(createPinia())
 
         vi.resetAllMocks()
 
         allRes.value = []
 
+    })
+
+    afterEach(() => {
+        vi.useRealTimers()
     })
 
     const mountComponent = () => {
@@ -87,7 +96,7 @@ describe('Pareto Front', () => {
     it('calls backend with the correct objectives when allRes changes', async () => {
         mountComponent()
 
-        await flushPromises()
+        await settle()
 
         allRes.value = [
             {
@@ -101,7 +110,7 @@ describe('Pareto Front', () => {
             }
         ]
 
-        await flushPromises()
+        await settle()
 
         expect(calculatePlotMock).toHaveBeenCalled()
 
@@ -121,7 +130,7 @@ describe('Pareto Front', () => {
 
         const wrapper = mountComponent()
 
-        await flushPromises()
+        await settle()
 
             allRes.value = [
                 {
@@ -144,7 +153,7 @@ describe('Pareto Front', () => {
                 }
             ]
         
-        await flushPromises()
+        await settle()
 
         expect(renderParetoFrontMock).toHaveBeenCalledWith(
             plotlyInstance.value,
@@ -157,19 +166,19 @@ describe('Pareto Front', () => {
     it('rerenders when allRes changes', async () => {
         mountComponent()
 
-        await flushPromises()
+        await settle()
 
         const callsBeforeChange = calculatePlotMock.mock.calls.length
 
-        allRes.value.push({
+        allRes.value = [...allRes.value, {
             configurations: {
                 frequency: 60,
                 threads: 8
             },
             results: [100]
-        })
+        }]
 
-        await flushPromises()
+        await settle()
 
         expect(calculatePlotMock.mock.calls.length)
             .toBeGreaterThan(callsBeforeChange)
@@ -178,7 +187,7 @@ describe('Pareto Front', () => {
     it('rerenders when paretoObjective1 changes', async () => {
         const wrapper = mountComponent()
 
-        await flushPromises()
+        await settle()
 
         const callsBeforeChange = calculatePlotMock.mock.calls.length
 
@@ -186,7 +195,7 @@ describe('Pareto Front', () => {
             paretoObjective1: 'runtime'
         })
 
-        await flushPromises()
+        await settle()
 
         expect(calculatePlotMock.mock.calls.length)
             .toBeGreaterThan(callsBeforeChange)
@@ -202,7 +211,7 @@ describe('Pareto Front', () => {
    it('rerenders when paretoObjective2 changes', async () => {
         const wrapper = mountComponent()
 
-        await flushPromises()
+        await settle()
 
         const callsBeforeChange = calculatePlotMock.mock.calls.length
 
@@ -210,7 +219,7 @@ describe('Pareto Front', () => {
             paretoObjective2: 'energy'
         })
 
-        await flushPromises()
+        await settle()
 
         expect(calculatePlotMock.mock.calls.length)
             .toBeGreaterThan(callsBeforeChange)
@@ -226,7 +235,7 @@ describe('Pareto Front', () => {
     it('rerenders when onlyShowParetoFront changes', async () => {
         const wrapper = mountComponent()
 
-        await flushPromises()
+        await settle()
 
         const callsBeforeChange = calculatePlotMock.mock.calls.length
 
@@ -234,7 +243,7 @@ describe('Pareto Front', () => {
             onlyShowParetoFront: true
         })
 
-        await flushPromises()
+        await settle()
 
         expect(calculatePlotMock.mock.calls.length)
             .toBeGreaterThan(callsBeforeChange)
@@ -251,7 +260,7 @@ describe('Pareto Front', () => {
 
         const wrapper = mountComponent()
 
-        allRes.value.push({
+        allRes.value = [...allRes.value, {
             configurations: {
                 frequency: 50,
                 threads: 4
@@ -259,9 +268,9 @@ describe('Pareto Front', () => {
             results: [100, 150],
             time: '10m 20s',
             'measured points': 1
-        })
+        }]
 
-        await flushPromises()
+        await settle()
 
         expect(calculatePlotMock).toHaveBeenCalled()
 

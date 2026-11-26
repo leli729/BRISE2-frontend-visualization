@@ -40,6 +40,22 @@ function findMatchingPoint(configuration: any): PointExp | undefined {
     )
 }
 
+// the measured points of one message, appended with one change of allRes
+function appendPoints(configurations: any[]): PointExp[] {
+    const min = new Date().getMinutes();
+    const sec = new Date().getSeconds();
+    if (configurations.length === 0) return []
+    const measured = allRes.value.length
+    const points: PointExp[] = configurations.map((configuration: any, index: number) => ({
+        'configurations': configuration.configurations,
+        'results': configuration.results,
+        'time': min + 'm ' + sec + 's',
+        'measured points': measured + index + 1
+    }))
+    allRes.value = [...allRes.value, ...points]
+    return points
+}
+
 function initMainEvents() {
     watch(experiment_description, () => {
         allRes.value = []
@@ -67,43 +83,20 @@ function initMainEvents() {
     subs.add(store.onEvent(MainEvent.DEFAULT)?.subscribe((message: any) => {
         if (experimentFinished.value) return
         if (message.headers['message_subtype'] === 'configuration') {
-            const configs = message.body
-            configs.forEach((configuration: any) => {
-                const min = new Date().getMinutes();
-                const sec = new Date().getSeconds();
-                const temp: PointExp = {
-                    'configurations': configuration.configurations,
-                    'results': configuration.results,
-                    'time': min + 'm ' + sec + 's',
-                    'measured points': allRes.value.length + 1
-                };
-                allRes.value.push(temp)
-            })
+            appendPoints(message.body)
         }
     }))
 
     // add last point
     subs.add(store.onEvent(MainEvent.FINAL)?.subscribe((message: any) => {
         if (message.headers['message_subtype'] === 'configuration') {
-            const configs = message.body;
-            configs.forEach((configuration: any) => {
-                // the solution is usually one of the measured configurations: don't count it twice
-                const measuredPoint = findMatchingPoint(configuration)
-                if (measuredPoint) {
-                    solution.value = measuredPoint
-                    return
-                }
-                const min = new Date().getMinutes();
-                const sec = new Date().getSeconds();
-                const temp: PointExp = {
-                    'configurations': configuration.configurations,
-                    'results': configuration.results,
-                    'time': min + 'm ' + sec + 's',
-                    'measured points': allRes.value.length + 1
-                };
-                allRes.value.push(temp);
-                solution.value = temp
-            });
+            const configs: any[] = message.body
+            // the solution is usually one of the measured configurations: don't count it twice
+            const measured = configs.map(findMatchingPoint)
+            const added = appendPoints(configs.filter((_, index) => !measured[index]))
+            let next = 0
+            const points = measured.map(point => point ?? added[next++])
+            if (points.length > 0) solution.value = points[points.length - 1]
         }
     }))
 
@@ -111,30 +104,13 @@ function initMainEvents() {
     subs.add(store.onEvent(MainEvent.NEW)?.subscribe((message: any) => {
         if (experimentFinished.value) return
         if (message.headers['message_subtype'] === 'configuration') {
-            const configs = message.body;
-
             // check the best availbale point
             const descr = experiment_description.value
 
             let objectives = descr?.['Context']?.['TaskConfiguration']?.['Objectives'] as any
             if (!objectives) return
 
-
-            configs.forEach((configuration: any) => {
-                const min = new Date().getMinutes();
-                const sec = new Date().getSeconds();
-                // number der measuret points before pushing into an array
-                const currentPointIndex = allRes.value.length + 1;
-
-                const temp: PointExp = {
-                    'configurations': configuration.configurations,
-                    'results': configuration.results,
-                    'time': min + 'm ' + sec + 's',
-                    'measured points': currentPointIndex
-                };
-
-                allRes.value.push(temp) // add new point (result)
-            })
+            appendPoints(message.body)
         }
     }))
 }

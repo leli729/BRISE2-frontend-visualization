@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { ref, watch, nextTick, onBeforeUnmount } from 'vue'
+import { ref } from 'vue'
 import { usePlotStore } from '../../../../entities/main/model/plot.store'
 import { renderEdf } from '../render'
 import { storeToRefs } from 'pinia'
 import { useMainEventStore } from '../../../../entities/main'
+import { useChartRender, CLIENT_REDRAW_INTERVAL_MS } from '../../model/use-chart-render'
 
 defineOptions({ name: 'EdfChart' })
 
@@ -13,34 +14,21 @@ const { allRes } = storeToRefs(plotStore)
 const { experiment_description, plotlyInstance } = storeToRefs(store)
 const edf = ref<HTMLElement | null>(null)
 
-async function render() {
-    await nextTick()
-
-    if (!plotlyInstance.value) return
-    if (!edf.value) return
+function render() {
     if (!experiment_description.value) 
         return
-    renderEdf(plotlyInstance.value, edf.value, allRes.value)
+    renderEdf(plotlyInstance.value!, edf.value!, allRes.value)
 }
 
-watch(
-    allRes,
-    () => {
-        render()
-    },
-    { deep: true }
-)
-
-// render once Plotly has finished loading; kept out of the deep watch above,
-// which would otherwise traverse the whole Plotly object
-watch(plotlyInstance, () => {
-    render()
-})
-
-onBeforeUnmount(() => {
-    if (edf.value && plotlyInstance.value) {
-        plotlyInstance.value.purge(edf.value)
-    }
+useChartRender({
+    element: edf,
+    plotly: plotlyInstance,
+    sources: [
+        allRes
+    ],
+    render,
+    active: () => true,
+    minIntervalMs: CLIENT_REDRAW_INTERVAL_MS
 })
 </script>
 

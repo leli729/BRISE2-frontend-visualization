@@ -1,14 +1,15 @@
-import { mount, flushPromises } from '@vue/test-utils'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { mount } from '@vue/test-utils'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { settle } from './chartTiming'
 import { createPinia, setActivePinia } from 'pinia'
-import { ref } from 'vue'
+import { ref, shallowRef } from 'vue'
 import { Edf } from '../../widgets/charts/edf'
 
 const { renderEdfMock } = vi.hoisted(() => ({
     renderEdfMock: vi.fn()
 }))
 
-const allRes = ref<any[]>([])
+const allRes = shallowRef<any[]>([])
 
 const experiment_description = ref({
     Context: {
@@ -43,8 +44,8 @@ vi.mock('../../widgets/charts/edf/render', () => ({
 }))
 
 describe('EDF Plot', () => {
-
     beforeEach(() => {
+        vi.useFakeTimers()
         setActivePinia(createPinia())
 
         vi.clearAllMocks()
@@ -65,6 +66,10 @@ describe('EDF Plot', () => {
         }
     })
 
+    afterEach(() => {
+        vi.useRealTimers()
+    })
+
     const mountComponent = () => {
         return mount(Edf, {
             global: {
@@ -76,11 +81,11 @@ describe('EDF Plot', () => {
     it('rerenders when allRes changes', async () => {
         const wrapper = mountComponent()
 
-        await flushPromises()
+        await settle()
 
         const callsBeforeChange = renderEdfMock.mock.calls.length
 
-        allRes.value.push({
+        allRes.value = [...allRes.value, {
             configurations: {
                 frequency: 60,
                 threads: 8
@@ -88,9 +93,9 @@ describe('EDF Plot', () => {
             results: {
                 runtime: 100
             }
-        })
+        }]
 
-        await flushPromises()
+        await settle()
 
         expect(renderEdfMock.mock.calls.length)
             .toBeGreaterThan(callsBeforeChange)

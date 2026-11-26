@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { ref, watch, nextTick, onBeforeUnmount } from 'vue'
+import { ref } from 'vue'
 import { usePlotStore } from '../../../../entities/main/model/plot.store'
 import { renderParetoFront } from '../render'
 import { storeToRefs } from 'pinia'
 import { MainClientApi } from '../../../../entities/main/api/main.client.store'
 import { useMainEventStore } from '../../../../entities/main'
+import { useChartRender, PLOT_REQUEST_INTERVAL_MS } from '../../model/use-chart-render'
 
 const plotStore = usePlotStore()
 const store = useMainEventStore()
@@ -18,11 +19,7 @@ const props = defineProps<{
     onlyShowParetoFront: boolean
 }>()
 
-async function render() {
-    await nextTick()
-
-    if (!plotlyInstance.value) return
-    if (!paretofront.value) return
+async function render(isMounted: () => boolean) {
     const result = await MainClientApi.calculatePlot(
         "pareto_front",
         {
@@ -32,32 +29,23 @@ async function render() {
         }
     )
 
-    renderParetoFront(plotlyInstance.value, paretofront.value, result, props.onlyShowParetoFront)
+    // the chart may have been unmounted while the request was in flight
+    if (!isMounted()) return
+    renderParetoFront(plotlyInstance.value!, paretofront.value!, result, props.onlyShowParetoFront)
 }
 
-watch(
-    [
-        allRes, 
-        () => props.paretoObjective1, 
+useChartRender({
+    element: paretofront,
+    plotly: plotlyInstance,
+    sources: [
+        allRes,
+        () => props.paretoObjective1,
         () => props.paretoObjective2,
         () => props.onlyShowParetoFront
     ],
-    () => {
-        render()
-    },
-    { deep: true }
-);
-
-// render once Plotly has finished loading; kept out of the deep watch above,
-// which would otherwise traverse the whole Plotly object
-watch(plotlyInstance, () => {
-    render()
-})
-
-onBeforeUnmount(() => {
-    if (paretofront.value && plotlyInstance.value) {
-        plotlyInstance.value.purge(paretofront.value)
-    }
+    render,
+    active: () => true,
+    minIntervalMs: PLOT_REQUEST_INTERVAL_MS
 })
 </script>
 

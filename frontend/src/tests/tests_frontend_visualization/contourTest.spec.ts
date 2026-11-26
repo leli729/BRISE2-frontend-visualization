@@ -1,7 +1,8 @@
-import { mount, flushPromises } from '@vue/test-utils'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { mount, enableAutoUnmount } from '@vue/test-utils'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { settle } from './chartTiming'
 import { createPinia, setActivePinia } from 'pinia'
-import { ref } from 'vue'
+import { ref, shallowRef } from 'vue'
 import { Contour } from '../../widgets/charts/contour'
 import { specsByName as fixtureSpecsByName } from './searchSpaceFixture'
 
@@ -24,7 +25,7 @@ const { renderContourMock } = vi.hoisted(() => ({
     renderContourMock: vi.fn()
 }))
 
-const allRes = ref<any[]>([])
+const allRes = shallowRef<any[]>([])
 
 const specsByName = ref(fixtureSpecsByName)
 
@@ -55,15 +56,23 @@ vi.mock('../../widgets/charts/contour/render', () => ({
 
 
 
-describe('Contour Plot', () => {
+// every mounted chart watches the module-level refs below until it is unmounted; a leftover one would draw with
+// its old props when a later test changes them
+enableAutoUnmount(afterEach)
 
+describe('Contour Plot', () => {
     beforeEach(() => {
+        vi.useFakeTimers()
         setActivePinia(createPinia())
 
         vi.clearAllMocks()
 
         allRes.value = []
 
+    })
+
+    afterEach(() => {
+        vi.useRealTimers()
     })
 
     const mountComponent = () => {
@@ -82,7 +91,7 @@ describe('Contour Plot', () => {
     it('calls backend with the correct parameters and objective when allRes changes', async () => {
         mountComponent()
 
-        await flushPromises()
+        await settle()
 
         allRes.value = [
             {
@@ -105,7 +114,7 @@ describe('Contour Plot', () => {
             }
         ]
 
-        await flushPromises()
+        await settle()
 
         expect(calculatePlotMock).toHaveBeenCalled()
 
@@ -126,7 +135,7 @@ describe('Contour Plot', () => {
 
         const wrapper = mountComponent()
 
-        await flushPromises()
+        await settle()
 
             allRes.value = [
                 {
@@ -140,7 +149,7 @@ describe('Contour Plot', () => {
                 }
             ]
         
-        await flushPromises()
+        await settle()
 
         expect(renderContourMock).toHaveBeenCalledWith(
             plotlyInstance.value,
@@ -153,19 +162,19 @@ describe('Contour Plot', () => {
     it('rerenders when allRes changes', async () => {
         mountComponent()
 
-        await flushPromises()
+        await settle()
 
         const callsBeforeChange = calculatePlotMock.mock.calls.length
 
-        allRes.value.push({
+        allRes.value = [...allRes.value, {
             configurations: {
                 frequency: 60,
                 threads: 8
             },
             results: [100]
-        })
+        }]
 
-        await flushPromises()
+        await settle()
 
         expect(calculatePlotMock.mock.calls.length)
             .toBeGreaterThan(callsBeforeChange)
@@ -174,7 +183,7 @@ describe('Contour Plot', () => {
     it('rerenders when contourParam1 changes', async () => {
         const wrapper = mountComponent()
 
-        await flushPromises()
+        await settle()
 
         const callsBeforeChange = calculatePlotMock.mock.calls.length
 
@@ -182,7 +191,7 @@ describe('Contour Plot', () => {
             contourParam1: 'threads'
         })
 
-        await flushPromises()
+        await settle()
 
         expect(calculatePlotMock.mock.calls.length)
             .toBeGreaterThan(callsBeforeChange)
@@ -201,7 +210,7 @@ describe('Contour Plot', () => {
     it('rerenders when contourParam2 changes', async () => {
         const wrapper = mountComponent()
 
-        await flushPromises()
+        await settle()
 
         const callsBeforeChange = calculatePlotMock.mock.calls.length
 
@@ -209,7 +218,7 @@ describe('Contour Plot', () => {
             contourParam2: 'frequency'
         })
 
-        await flushPromises()
+        await settle()
 
         expect(calculatePlotMock.mock.calls.length)
             .toBeGreaterThan(callsBeforeChange)
@@ -228,7 +237,7 @@ describe('Contour Plot', () => {
     it('rerenders when contourObjective changes', async () => {
         const wrapper = mountComponent()
 
-        await flushPromises()
+        await settle()
 
         const callsBeforeChange = calculatePlotMock.mock.calls.length
 
@@ -236,7 +245,7 @@ describe('Contour Plot', () => {
             contourObjective: 'energy'
         })
 
-        await flushPromises()
+        await settle()
 
         expect(calculatePlotMock.mock.calls.length)
             .toBeGreaterThan(callsBeforeChange)
@@ -261,7 +270,7 @@ describe('Contour Plot', () => {
 
         const wrapper = mountComponent()
 
-         allRes.value.push({
+         allRes.value = [...allRes.value, {
             configurations: {
                 frequency: 50,
                 threads: 4
@@ -269,9 +278,9 @@ describe('Contour Plot', () => {
             results: [100],
             time: '10m 20s',
             'measured points': 1
-        })
+        }]
 
-        await flushPromises()
+        await settle()
 
         expect(renderContourMock).toHaveBeenCalledWith(
             plotlyInstance.value,
@@ -284,13 +293,13 @@ describe('Contour Plot', () => {
     it('leaves out trials in which a selected parameter is inactive', async () => {
         mountComponent()
 
-        await flushPromises()
+        await settle()
 
         const active = { configurations: { frequency: 60, threads: 8 }, results: { runtime: 100 } }
         const inactive = { configurations: { frequency: 50 }, results: { runtime: 90 } }
         allRes.value = [active, inactive]
 
-        await flushPromises()
+        await settle()
 
         expect(calculatePlotMock.mock.lastCall?.[1].trials).toEqual([active])
     })

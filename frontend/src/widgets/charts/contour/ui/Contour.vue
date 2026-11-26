@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { ref, watch, nextTick, onBeforeUnmount } from 'vue'
+import { ref } from 'vue'
 import { usePlotStore } from '../../../../entities/main/model/plot.store'
 import { renderContour } from '../render'
 import { storeToRefs } from 'pinia'
 import { MainClientApi } from '../../../../entities/main/api/main.client.store'
 import { useMainEventStore } from '../../../../entities/main'
 import { trialsWithParameters } from '../../../../entities/experiment/lib/regions'
+import { useChartRender, PLOT_REQUEST_INTERVAL_MS } from '../../model/use-chart-render'
 
 defineOptions({ name: 'ContourChart' })
 
@@ -21,12 +22,7 @@ const props = defineProps<{
     contourObjective: string
 }>()
 
-async function render() {
-    await nextTick()
-
-    if (!plotlyInstance.value) return
-    if (!contour.value) 
-        return
+async function render(isMounted: () => boolean) {
     // Availability of Contour Plot currently not defined correctly by feature model. Therefore checking here if 2 valid HPs are available.
     // This check can be deleted once the constraint is implemented correctly in the feature model.
     if (!props.contourParam1 || !props.contourParam2 || props.contourParam1 === "" || props.contourParam2 === "") {
@@ -43,32 +39,23 @@ async function render() {
         }
     )
 
-    renderContour(plotlyInstance.value, contour.value, result, specsByName.value)
+    // the chart may have been unmounted while the request was in flight
+    if (!isMounted()) return
+    renderContour(plotlyInstance.value!, contour.value!, result, specsByName.value)
 }
 
-watch(
-    [
-        allRes, 
-        () => props.contourParam1, 
-        () => props.contourParam2, 
+useChartRender({
+    element: contour,
+    plotly: plotlyInstance,
+    sources: [
+        allRes,
+        () => props.contourParam1,
+        () => props.contourParam2,
         () => props.contourObjective
     ],
-    () => {
-        render()
-    },
-    { deep: true }
-);
-
-// render once Plotly has finished loading; kept out of the deep watch above,
-// which would otherwise traverse the whole Plotly object
-watch(plotlyInstance, () => {
-    render()
-})
-
-onBeforeUnmount(() => {
-    if (contour.value && plotlyInstance.value) {
-        plotlyInstance.value.purge(contour.value)
-    }
+    render,
+    active: () => true,
+    minIntervalMs: PLOT_REQUEST_INTERVAL_MS
 })
 </script>
 

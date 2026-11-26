@@ -1,7 +1,8 @@
-import { mount, flushPromises } from '@vue/test-utils'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { mount, enableAutoUnmount } from '@vue/test-utils'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { settle } from './chartTiming'
 import { createPinia, setActivePinia } from 'pinia'
-import { ref } from 'vue'
+import { ref, shallowRef } from 'vue'
 import { HypImp } from '../../widgets/charts/hyp-imp'
 import { regionOf } from './searchSpaceFixture'
 
@@ -20,7 +21,7 @@ const { renderHypImpMock } = vi.hoisted(() => ({
     renderHypImpMock: vi.fn()
 }))
 
-const allRes = ref<any[]>([])
+const allRes = shallowRef<any[]>([])
 
 const plotlyInstance = ref({ react: vi.fn(), purge: vi.fn() })
 
@@ -48,15 +49,23 @@ vi.mock('../../widgets/charts/hyp-imp/render', () => ({
 
 
 
-describe('Hyperparameter Importances', () => {
+// every mounted chart watches the module-level refs below until it is unmounted; a leftover one would draw with
+// its old props when a later test changes them
+enableAutoUnmount(afterEach)
 
+describe('Hyperparameter Importances', () => {
     beforeEach(() => {
+        vi.useFakeTimers()
         setActivePinia(createPinia())
 
         vi.clearAllMocks()
 
         allRes.value = []
 
+    })
+
+    afterEach(() => {
+        vi.useRealTimers()
     })
 
     const mountComponent = () => {
@@ -75,7 +84,7 @@ describe('Hyperparameter Importances', () => {
     it('calls backend with the correct parameters and objective when allRes changes', async () => {
         mountComponent()
 
-        await flushPromises()
+        await settle()
 
         allRes.value = [
             {
@@ -89,7 +98,7 @@ describe('Hyperparameter Importances', () => {
             }
         ]
 
-        await flushPromises()
+        await settle()
 
         expect(calculatePlotMock).toHaveBeenCalled()
 
@@ -109,7 +118,7 @@ describe('Hyperparameter Importances', () => {
 
         const wrapper = mountComponent()
 
-        await flushPromises()
+        await settle()
 
             allRes.value = [
                 {
@@ -123,7 +132,7 @@ describe('Hyperparameter Importances', () => {
                 }
             ]
         
-        await flushPromises()
+        await settle()
 
         expect(renderHypImpMock).toHaveBeenCalledWith(
             plotlyInstance.value,
@@ -135,19 +144,19 @@ describe('Hyperparameter Importances', () => {
     it('rerenders when allRes changes', async () => {
         mountComponent()
 
-        await flushPromises()
+        await settle()
 
         const callsBeforeChange = calculatePlotMock.mock.calls.length
 
-        allRes.value.push({
+        allRes.value = [...allRes.value, {
             configurations: {
                 frequency: 60,
                 threads: 8
             },
             results: [100]
-        })
+        }]
 
-        await flushPromises()
+        await settle()
 
         expect(calculatePlotMock.mock.calls.length)
             .toBeGreaterThan(callsBeforeChange)
@@ -156,7 +165,7 @@ describe('Hyperparameter Importances', () => {
     it('rerenders when hypImpParams changes', async () => {
         const wrapper = mountComponent()
 
-        await flushPromises()
+        await settle()
 
         const callsBeforeChange = calculatePlotMock.mock.calls.length
 
@@ -164,7 +173,7 @@ describe('Hyperparameter Importances', () => {
             hypImpParams: ['frequency']
         })
 
-        await flushPromises()
+        await settle()
 
         expect(calculatePlotMock.mock.calls.length)
             .toBeGreaterThan(callsBeforeChange)
@@ -180,7 +189,7 @@ describe('Hyperparameter Importances', () => {
     it('rerenders when hypImpObjective changes', async () => {
         const wrapper = mountComponent()
 
-        await flushPromises()
+        await settle()
 
         const callsBeforeChange = calculatePlotMock.mock.calls.length
 
@@ -188,7 +197,7 @@ describe('Hyperparameter Importances', () => {
             hypImpObjective: 'energy'
         })
 
-        await flushPromises()
+        await settle()
 
         expect(calculatePlotMock.mock.calls.length)
             .toBeGreaterThan(callsBeforeChange)
@@ -210,7 +219,7 @@ describe('Hyperparameter Importances', () => {
 
         const wrapper = mountComponent()
 
-         allRes.value.push({
+         allRes.value = [...allRes.value, {
             configurations: {
                 frequency: 50,
                 threads: 4
@@ -218,9 +227,9 @@ describe('Hyperparameter Importances', () => {
             results: [100],
             time: '10m 20s',
             'measured points': 1
-        })
+        }]
 
-        await flushPromises()
+        await settle()
 
         expect(renderHypImpMock).toHaveBeenCalledWith(
             plotlyInstance.value,
@@ -232,13 +241,13 @@ describe('Hyperparameter Importances', () => {
     it('sends the trials of its region, also those in which a selected parameter is inactive', async () => {
         mountComponent()
 
-        await flushPromises()
+        await settle()
 
         const active = { configurations: { frequency: 60, threads: 8 }, results: { runtime: 100 } }
         const inactive = { configurations: { frequency: 50 }, results: { runtime: 90 } }
         allRes.value = [active, inactive]
 
-        await flushPromises()
+        await settle()
 
         expect(calculatePlotMock.mock.lastCall?.[1].trials).toEqual([active, inactive])
     })
@@ -246,13 +255,13 @@ describe('Hyperparameter Importances', () => {
     it('leaves out the trials of other regions', async () => {
         mountComponent()
 
-        await flushPromises()
+        await settle()
 
         const own = { configurations: { frequency: 60, threads: 8 }, results: { runtime: 100 } }
         const other = { configurations: { elsewhere: 1 }, results: { runtime: 90 } }
         allRes.value = [own, other]
 
-        await flushPromises()
+        await settle()
 
         expect(calculatePlotMock.mock.lastCall?.[1].trials).toEqual([own])
     })

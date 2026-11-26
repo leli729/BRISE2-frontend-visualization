@@ -1,7 +1,8 @@
-import { mount, flushPromises } from '@vue/test-utils'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { mount } from '@vue/test-utils'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { settle } from './chartTiming'
 import { createPinia, setActivePinia } from 'pinia'
-import { ref } from 'vue'
+import { ref, shallowRef } from 'vue'
 import { Rank } from '../../widgets/charts/rank'
 import { regionOf, specsByName as fixtureSpecsByName } from './searchSpaceFixture'
 
@@ -9,7 +10,7 @@ const { renderRankMock } = vi.hoisted(() => ({
     renderRankMock: vi.fn()
 }))
 
-const allRes = ref<any[]>([])
+const allRes = shallowRef<any[]>([])
 
 const specsByName = ref(fixtureSpecsByName)
 
@@ -33,14 +34,18 @@ vi.mock('../../widgets/charts/rank/render', () => ({
 }))
 
 describe('Rank Plot', () => {
-
     beforeEach(() => {
+        vi.useFakeTimers()
         setActivePinia(createPinia())
 
         vi.clearAllMocks()
 
         allRes.value = []
 
+    })
+
+    afterEach(() => {
+        vi.useRealTimers()
     })
 
    const mountComponent = () => {
@@ -60,11 +65,11 @@ describe('Rank Plot', () => {
     it('rerenders when allRes changes', async () => {
         mountComponent()
 
-        await flushPromises()
+        await settle()
 
         const callsBeforeChange = renderRankMock.mock.calls.length
 
-        allRes.value.push({
+        allRes.value = [...allRes.value, {
             configurations: {
                 frequency: 60,
                 threads: 8
@@ -72,9 +77,9 @@ describe('Rank Plot', () => {
             results: {
                 runtime: 100
             }
-        })
+        }]
 
-        await flushPromises()
+        await settle()
 
         expect(renderRankMock.mock.calls.length)
             .toBeGreaterThan(callsBeforeChange)
@@ -83,7 +88,7 @@ describe('Rank Plot', () => {
     it('rerenders when rankParam1 changes', async () => {
         const wrapper = mountComponent()
 
-        await flushPromises()
+        await settle()
 
         const callsBeforeChange = renderRankMock.mock.calls.length
 
@@ -91,7 +96,7 @@ describe('Rank Plot', () => {
             rankParam1: 'frequency'
         })
 
-        await flushPromises()
+        await settle()
 
         expect(renderRankMock.mock.calls.length)
             .toBeGreaterThan(callsBeforeChange)
@@ -100,7 +105,7 @@ describe('Rank Plot', () => {
     it('rerenders when rankParam2 changes', async () => {
         const wrapper = mountComponent()
 
-        await flushPromises()
+        await settle()
 
         const callsBeforeChange = renderRankMock.mock.calls.length
 
@@ -108,7 +113,7 @@ describe('Rank Plot', () => {
             rankParam2: 'threads'
         })
 
-        await flushPromises()
+        await settle()
 
         expect(renderRankMock.mock.calls.length)
             .toBeGreaterThan(callsBeforeChange)
@@ -117,7 +122,7 @@ describe('Rank Plot', () => {
     it('rerenders when rankObjective changes', async () => {
         const wrapper = mountComponent()
 
-        await flushPromises()
+        await settle()
 
         const callsBeforeChange = renderRankMock.mock.calls.length
 
@@ -125,7 +130,7 @@ describe('Rank Plot', () => {
             rankObjective: 'energy'
         })
 
-        await flushPromises()
+        await settle()
 
         expect(renderRankMock.mock.calls.length)
             .toBeGreaterThan(callsBeforeChange)
@@ -133,10 +138,10 @@ describe('Rank Plot', () => {
 
     it('draws with the parameters of the search space', async () => {
         mountComponent()
-        await flushPromises()
+        await settle()
 
         allRes.value = [{ configurations: { frequency: 60, threads: 8 }, results: { runtime: 100 } }]
-        await flushPromises()
+        await settle()
 
         expect(renderRankMock.mock.lastCall?.[6]).toEqual(specsByName.value)
     })
@@ -144,13 +149,13 @@ describe('Rank Plot', () => {
     it('draws the trials of its region, also those in which a selected parameter is inactive', async () => {
         mountComponent()
 
-        await flushPromises()
+        await settle()
 
         const active = { configurations: { frequency: 60, threads: 8 }, results: { runtime: 100 } }
         const inactive = { configurations: { frequency: 50 }, results: { runtime: 90 } }
         allRes.value = [active, inactive]
 
-        await flushPromises()
+        await settle()
 
         expect(renderRankMock.mock.lastCall?.[2]).toEqual([active, inactive])
     })
@@ -158,13 +163,13 @@ describe('Rank Plot', () => {
     it('leaves out the trials of other regions', async () => {
         mountComponent()
 
-        await flushPromises()
+        await settle()
 
         const own = { configurations: { frequency: 60, threads: 8 }, results: { runtime: 100 } }
         const other = { configurations: { elsewhere: 1 }, results: { runtime: 90 } }
         allRes.value = [own, other]
 
-        await flushPromises()
+        await settle()
 
         expect(renderRankMock.mock.lastCall?.[2]).toEqual([own])
     })

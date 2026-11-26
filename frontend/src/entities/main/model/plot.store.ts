@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, shallowRef } from 'vue'
 
 export interface PointExp {
     configurations: Record<string, any>;
@@ -24,7 +24,9 @@ export const usePlotStore = defineStore('plots', () => {
     
     const visibleCharts = ref<string[]>([])
 
-    const allRes = ref<PointExp[]>([])
+    // shallow: a change is the assignment of a new array (points are appended as `allRes.value = [...allRes.value, point]`),
+    // so a watcher costs nothing per point instead of a traversal of all of them
+    const allRes = shallowRef<PointExp[]>([])
 
     const canChangeVisibleCharts = ref(false)
 

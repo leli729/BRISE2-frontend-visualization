@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { ref, watch, nextTick, onBeforeUnmount } from 'vue'
+import { ref } from 'vue'
 import { usePlotStore } from '../../../../entities/main/model/plot.store'
 import { renderParaCoord } from '../render'
 import { storeToRefs } from 'pinia'
 import { useMainEventStore } from '../../../../entities/main'
 import { trialsOfRegion } from '../../../../entities/experiment/lib/regions'
 import type { SearchSpaceRegion } from '../../../../entities/experiment/model/experiment.model'
+import { useChartRender, CLIENT_REDRAW_INTERVAL_MS } from '../../model/use-chart-render'
 
 const store = useMainEventStore()
 const plotStore = usePlotStore()
@@ -18,38 +19,24 @@ const props = defineProps<{
     paraCoordObjective: string
 }>()
 
-async function render() {
-    await nextTick()
-
-    if (!plotlyInstance.value) return
-    if (!paraCoord.value) return
+function render() {
     // a trial of the region without a selected parameter is drawn as inactive in it
     const trials = trialsOfRegion(allRes.value, props.region)
-    renderParaCoord(plotlyInstance.value, paraCoord.value, trials, props.paraCoordParams, props.paraCoordObjective, specsByName.value)
+    renderParaCoord(plotlyInstance.value!, paraCoord.value!, trials, props.paraCoordParams, props.paraCoordObjective, specsByName.value)
 }
 
-watch(
-    [
-        allRes, 
-        () => props.paraCoordParams, 
+useChartRender({
+    element: paraCoord,
+    plotly: plotlyInstance,
+    sources: [
+        allRes,
+        // the parameters are a prop array: a getter that reads its items, as the watch is not deep
+        () => [...props.paraCoordParams],
         () => props.paraCoordObjective
     ],
-    () => {
-        render()
-    },
-    { deep: true }
-)
-
-// render once Plotly has finished loading; kept out of the deep watch above,
-// which would otherwise traverse the whole Plotly object
-watch(plotlyInstance, () => {
-    render()
-})
-
-onBeforeUnmount(() => {
-    if (paraCoord.value && plotlyInstance.value) {
-        plotlyInstance.value.purge(paraCoord.value)
-    }
+    render,
+    active: () => true,
+    minIntervalMs: CLIENT_REDRAW_INTERVAL_MS
 })
 </script>
 

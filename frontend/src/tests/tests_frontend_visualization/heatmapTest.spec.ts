@@ -1,7 +1,8 @@
-import { mount, flushPromises, enableAutoUnmount } from '@vue/test-utils'
+import { mount, enableAutoUnmount } from '@vue/test-utils'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { settle } from './chartTiming'
 import { createPinia, setActivePinia } from 'pinia'
-import { ref } from 'vue'
+import { ref, shallowRef } from 'vue'
 import { Heatmap } from '../../widgets/charts/heatmap'
 import { theme } from '../../widgets/charts/model/heatmap-theme'
 import { Color } from '../../widgets/charts/model/chart.types'
@@ -32,7 +33,7 @@ const specsOfRegion = { ...categoricalSpecsByName, [M1]: m1, [K1]: k1 }
 const measuredN01 = { configurations: { [N0]: `${N0}.N01`, [N1]: `${N1}.N11`, [M1]: `${M1}.A`, [K1]: `${K1}.B` }, results: { runtime: 5 } }
 const measuredN02 = { configurations: { [N0]: `${N0}.N02`, [O1]: `${O1}.O11` }, results: { runtime: 9 } }
 
-const allRes = ref<any[]>([])
+const allRes = shallowRef<any[]>([])
 const solution = ref<any>(null)
 const specsByName = ref(specsOfRegion)
 const plotlyInstance = ref<any>({ react: vi.fn(), purge: vi.fn() })
@@ -60,12 +61,17 @@ enableAutoUnmount(afterEach)
 
 describe('Heatmap', () => {
     beforeEach(() => {
+        vi.useFakeTimers()
         setActivePinia(createPinia())
         vi.clearAllMocks()
         allRes.value = []
         solution.value = null
         plotlyInstance.value = { react: vi.fn(), purge: vi.fn() }
         theme.value.color = Color[0] // the colour scale is shared by every chart, so a test must not leave its choice
+    })
+
+    afterEach(() => {
+        vi.useRealTimers()
     })
 
     const mountComponent = (region: SearchSpaceRegion = regionN01) => mount(Heatmap, {
@@ -83,7 +89,7 @@ describe('Heatmap', () => {
     it('draws the measured configurations of its region only', async () => {
         allRes.value = [measuredN01, measuredN02]
         mountComponent()
-        await flushPromises()
+        await settle()
 
         expect(lastRender()[2]).toEqual([measuredN01])
     })
@@ -92,7 +98,7 @@ describe('Heatmap', () => {
         allRes.value = [measuredN01]
         solution.value = measuredN01
         mountComponent()
-        await flushPromises()
+        await settle()
 
         const [, , trials, param1, param2, objective, specs, drawnSolution] = lastRender()
         expect([trials, param1, param2, objective]).toEqual([[measuredN01], N1, M1, 'runtime'])
@@ -104,7 +110,7 @@ describe('Heatmap', () => {
         allRes.value = [measuredN01, measuredN02]
         solution.value = measuredN02
         mountComponent()
-        await flushPromises()
+        await settle()
 
         expect(lastRender()[7]).toBeNull()
     })
@@ -113,21 +119,21 @@ describe('Heatmap', () => {
         // at the end of a run the solution is usually a measured point already: only the solution changes
         allRes.value = [measuredN01]
         mountComponent()
-        await flushPromises()
+        await settle()
 
         solution.value = measuredN01
-        await flushPromises()
+        await settle()
 
         expect(lastRender()[7]).toEqual(measuredN01)
     })
 
     it('rerenders when allRes changes', async () => {
         mountComponent()
-        await flushPromises()
+        await settle()
         const callsBeforeChange = renderHeatmapMock.mock.calls.length
 
-        allRes.value.push(measuredN01)
-        await flushPromises()
+        allRes.value = [...allRes.value, measuredN01]
+        await settle()
 
         expect(renderHeatmapMock.mock.calls.length).toBeGreaterThan(callsBeforeChange)
     })
@@ -138,32 +144,32 @@ describe('Heatmap', () => {
         ['heatmapObjective', 'energy']
     ])('rerenders when %s changes', async (prop, value) => {
         const wrapper = mountComponent()
-        await flushPromises()
+        await settle()
         const callsBeforeChange = renderHeatmapMock.mock.calls.length
 
         await wrapper.setProps({ [prop]: value })
-        await flushPromises()
+        await settle()
 
         expect(renderHeatmapMock.mock.calls.length).toBeGreaterThan(callsBeforeChange)
     })
 
     it('rerenders when the colour scale changes', async () => {
         const wrapper = mountComponent()
-        await flushPromises()
+        await settle()
         const callsBeforeChange = renderHeatmapMock.mock.calls.length
 
         await wrapper.find('select').setValue('Greens')
-        await flushPromises()
+        await settle()
 
         expect(renderHeatmapMock.mock.calls.length).toBeGreaterThan(callsBeforeChange)
     })
 
     it('sets the shared colour scale', async () => {
         const wrapper = mountComponent()
-        await flushPromises()
+        await settle()
 
         await wrapper.find('select').setValue('Jet')
-        await flushPromises()
+        await settle()
 
         expect(theme.value.color).toBe('Jet')
     })
@@ -171,18 +177,18 @@ describe('Heatmap', () => {
     it('draws once Plotly has loaded', async () => {
         plotlyInstance.value = null
         mountComponent()
-        await flushPromises()
+        await settle()
         expect(renderHeatmapMock).not.toHaveBeenCalled()
 
         plotlyInstance.value = { react: vi.fn(), purge: vi.fn() }
-        await flushPromises()
+        await settle()
 
         expect(renderHeatmapMock).toHaveBeenCalled()
     })
 
     it('purges its plot when it goes away', async () => {
         const wrapper = mountComponent()
-        await flushPromises()
+        await settle()
 
         wrapper.unmount()
 
