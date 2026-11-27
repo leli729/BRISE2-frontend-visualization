@@ -1,4 +1,4 @@
-import { onBeforeUnmount, onMounted, watch } from 'vue'
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { Ref, WatchSource } from 'vue'
 import type { PlotlyInstance } from './chart.types'
 
@@ -6,6 +6,9 @@ import type { PlotlyInstance } from './chart.types'
 export const CLIENT_REDRAW_INTERVAL_MS = 250
 // the same for a chart that asks main-node for its data: each render is a request
 export const PLOT_REQUEST_INTERVAL_MS = 2000
+// a chart counts as in view this far above and below the viewport: under half a panel (Plotly's default height is 450 px),
+// so that a panel is drawn just before it is visible while few panels are in range, each holding 3 WebGL contexts
+const IN_VIEW_MARGIN = '200px 0px'
 
 interface ChartRender {
     // the chart's element
@@ -19,22 +22,34 @@ interface ChartRender {
     render: (isMounted: () => boolean) => void | Promise<void>
     // a chart that is not active does no work and draws once, with the latest data, when it turns active
     active: () => boolean
+    // draw only while the element is in view, and release the chart's WebGL contexts when it leaves: a chart of many
+    // panels would otherwise exceed the browser's limit of contexts
+    drawOnlyInView?: boolean
     minIntervalMs: number
 }
 
 // Draws a chart when its sources change: at most once per `minIntervalMs` (the first change at once, the changes
 // that follow within the interval as one render at its end, with the latest data), never two renders of the chart at
-// the same time, and only while it is active and Plotly is ready. Purges the chart on unmount.
-export function useChartRender({ element, plotly, sources, render, active, minIntervalMs }: ChartRender) {
+// the same time, and only while it is active (and in view, with `drawOnlyInView`) and Plotly is ready. With `drawOnlyInView`
+// a chart that has been drawn is released when it stops being shown: purged, its WebGL contexts released, and it draws
+// again once shown; without it, an inactive chart keeps its last drawing. Purges the chart on unmount.
+export function useChartRender({ element, plotly, sources, render, active, drawOnlyInView = false, minIntervalMs }: ChartRender) {
     let mounted = false
     let needsRender = true
     let running = false
+    let drawn = false
+    let observer: IntersectionObserver | null = null
+    // what the observer last reported; false until its first report
+    const inView = ref(false)
     let lastStart = -Infinity
     let timer: ReturnType<typeof setTimeout> | null = null
 
+    // a chart that is not observed is never held back by the view
+    const shown = () => active() && (!drawOnlyInView || inView.value)
+
     function schedule() {
         if (!mounted || !needsRender || running || timer !== null) return
-        if (!active() || !plotly.value || !element.value) return
+        if (!shown() || !plotly.value || !element.value) return
         const wait = lastStart + minIntervalMs - Date.now()
         if (wait > 0) {
             timer = setTimeout(() => {
@@ -48,6 +63,7 @@ export function useChartRender({ element, plotly, sources, render, active, minIn
 
     async function run() {
         running = true
+        drawn = true
         needsRender = false
         lastStart = Date.now()
         try {
@@ -61,20 +77,42 @@ export function useChartRender({ element, plotly, sources, render, active, minIn
         schedule()
     }
 
+    // `Plotly.purge` removes the WebGL canvases but does not release their contexts, and the browser counts a removed
+    // canvas until it is collected: the contexts are taken first, as the purge removes the canvases
+    function release() {
+        if (!drawn || !element.value || !plotly.value) return
+        const contexts = [...element.value.querySelectorAll<HTMLCanvasElement>('canvas.gl-canvas')]
+            .map(canvas => canvas.getContext('webgl') as WebGLRenderingContext | null)
+        plotly.value.purge(element.value)
+        for (const context of contexts) context?.getExtension('WEBGL_lose_context')?.loseContext()
+        drawn = false
+        needsRender = true
+    }
+
     watch([...sources, plotly], () => {
         needsRender = true
         schedule()
     })
 
-    watch(active, schedule)
+    watch(shown, (isShown) => {
+        if (isShown) schedule()
+        else if (drawOnlyInView) release()
+    })
 
     onMounted(() => {
         mounted = true
+        if (drawOnlyInView && element.value) {
+            observer = new IntersectionObserver(entries => {
+                inView.value = entries[entries.length - 1].isIntersecting
+            }, { rootMargin: IN_VIEW_MARGIN })
+            observer.observe(element.value)
+        }
         schedule()
     })
 
     onBeforeUnmount(() => {
         mounted = false
+        observer?.disconnect()
         if (timer !== null) clearTimeout(timer)
         timer = null
         if (element.value && plotly.value) {

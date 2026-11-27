@@ -2,6 +2,7 @@ import { mount, flushPromises, enableAutoUnmount } from '@vue/test-utils'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { defineComponent, h, ref, shallowRef } from 'vue'
 import { useChartRender } from '../../widgets/charts/model/use-chart-render'
+import { installIntersectionObserver, uninstallIntersectionObserver, setInView, createdObservers } from './intersectionObserverStub'
 
 const INTERVAL_MS = 250
 
@@ -16,7 +17,7 @@ const active = ref(true)
 // the value of the source each drawing saw
 let seen: number[] = []
 
-function mountChart(render: Drawing = () => { seen.push(data.value) }) {
+function mountChart(render: Drawing = () => { seen.push(data.value) }, options: { drawOnlyInView?: boolean } = {}) {
     const drawing = vi.fn(render)
     const Chart = defineComponent({
         setup() {
@@ -27,7 +28,8 @@ function mountChart(render: Drawing = () => { seen.push(data.value) }) {
                 sources: [data],
                 render: drawing,
                 active: () => active.value,
-                minIntervalMs: INTERVAL_MS
+                minIntervalMs: INTERVAL_MS,
+                ...options
             })
             return () => h('div', { ref: element })
         }
@@ -46,6 +48,7 @@ describe('useChartRender', () => {
 
     afterEach(() => {
         vi.useRealTimers()
+        uninstallIntersectionObserver()
     })
 
     it('draws once on mount when Plotly is ready and the chart is active', async () => {
@@ -193,5 +196,158 @@ describe('useChartRender', () => {
         await flushPromises()
 
         expect(mountedWhenResumed).toBe(false)
+    })
+
+    describe('draw only in view', () => {
+        const chartInView = (render?: Drawing) => mountChart(render, { drawOnlyInView: true })
+
+        // a canvas of Plotly's WebGL layers, whose context can be released with `loseContext`
+        function glCanvas() {
+            const loseContext = vi.fn()
+            const canvas = document.createElement('canvas')
+            canvas.className = 'gl-canvas'
+            canvas.getContext = vi.fn(() => ({ getExtension: (name: string) => name === 'WEBGL_lose_context' ? { loseContext } : null })) as any
+            return { canvas, loseContext }
+        }
+
+        it('draws nothing before the chart is reported in view, and once after', async () => {
+            installIntersectionObserver({ reportOnObserve: false })
+            const { wrapper, drawing } = chartInView()
+            await flushPromises()
+            expect(drawing).not.toHaveBeenCalled()
+
+            setInView(wrapper.element, true)
+            await flushPromises()
+
+            expect(drawing).toHaveBeenCalledTimes(1)
+        })
+
+        it('releases the WebGL contexts of its canvases when it leaves the view, although the purge removes the canvases', async () => {
+            installIntersectionObserver()
+            const { wrapper, drawing } = chartInView()
+            await flushPromises()
+            expect(drawing).toHaveBeenCalledTimes(1)
+            const first = glCanvas()
+            const second = glCanvas()
+            const other = document.createElement('canvas')
+            other.getContext = vi.fn() as any
+            wrapper.element.append(first.canvas, second.canvas, other)
+            // Plotly's purge removes the canvases from the element
+            plotly.value.purge.mockImplementation((element: HTMLElement) => {
+                element.querySelectorAll('.gl-canvas').forEach(canvas => canvas.remove())
+            })
+
+            setInView(wrapper.element, false)
+            await flushPromises()
+
+            expect(plotly.value.purge).toHaveBeenCalledWith(wrapper.element)
+            expect(first.loseContext).toHaveBeenCalledTimes(1)
+            expect(second.loseContext).toHaveBeenCalledTimes(1)
+            expect(other.getContext).not.toHaveBeenCalled()
+        })
+
+        it('releases the chart when it turns inactive while in view', async () => {
+            installIntersectionObserver()
+            const { wrapper } = chartInView()
+            await flushPromises()
+
+            active.value = false
+            await flushPromises()
+
+            expect(plotly.value.purge).toHaveBeenCalledWith(wrapper.element)
+        })
+
+        it('does not release a chart that was never drawn: mounted off screen, then its tab is left', async () => {
+            installIntersectionObserver({ reportOnObserve: false })
+            const { drawing } = chartInView()
+            await flushPromises()
+            expect(drawing).not.toHaveBeenCalled()
+
+            active.value = false
+            await flushPromises()
+
+            expect(plotly.value.purge).not.toHaveBeenCalled()
+        })
+
+        it('draws once with the latest data when it comes back in view, and nothing while it was out of it', async () => {
+            installIntersectionObserver()
+            const { wrapper, drawing } = chartInView()
+            await flushPromises()
+            vi.advanceTimersByTime(4 * INTERVAL_MS)
+            setInView(wrapper.element, false)
+            await flushPromises()
+
+            data.value = 1
+            await flushPromises()
+            data.value = 2
+            await flushPromises()
+            vi.advanceTimersByTime(4 * INTERVAL_MS)
+            await flushPromises()
+            expect(drawing).toHaveBeenCalledTimes(1)
+
+            setInView(wrapper.element, true)
+            await flushPromises()
+
+            expect(drawing).toHaveBeenCalledTimes(2)
+            expect(seen).toEqual([0, 2])
+        })
+
+        it('draws again when it comes back in view although its data did not change, as its drawing was purged', async () => {
+            installIntersectionObserver()
+            const { wrapper, drawing } = chartInView()
+            await flushPromises()
+            vi.advanceTimersByTime(4 * INTERVAL_MS)
+            setInView(wrapper.element, false)
+            await flushPromises()
+
+            setInView(wrapper.element, true)
+            await flushPromises()
+
+            expect(drawing).toHaveBeenCalledTimes(2)
+        })
+
+        it('draws nothing when a drawing falls due after it left the view, and once with the latest data when it comes back', async () => {
+            installIntersectionObserver()
+            const { wrapper, drawing } = chartInView()
+            await flushPromises()
+            vi.advanceTimersByTime(4 * INTERVAL_MS)
+            data.value = 1
+            await flushPromises()
+            data.value = 2
+            await flushPromises()
+            expect(drawing).toHaveBeenCalledTimes(2)
+
+            setInView(wrapper.element, false)
+            await flushPromises()
+            vi.advanceTimersByTime(4 * INTERVAL_MS)
+            await flushPromises()
+            expect(drawing).toHaveBeenCalledTimes(2)
+
+            setInView(wrapper.element, true)
+            await flushPromises()
+
+            expect(drawing).toHaveBeenCalledTimes(3)
+            expect(seen).toEqual([0, 1, 2])
+        })
+
+        it('is not observed without the option', async () => {
+            installIntersectionObserver({ reportOnObserve: false })
+            const { drawing } = mountChart()
+            await flushPromises()
+
+            expect(drawing).toHaveBeenCalledTimes(1)
+            expect(createdObservers()).toHaveLength(0)
+        })
+
+        it('stops observing when it is unmounted', async () => {
+            installIntersectionObserver()
+            const { wrapper } = chartInView()
+            await flushPromises()
+            expect(createdObservers()).toHaveLength(1)
+
+            wrapper.unmount()
+
+            expect(createdObservers()[0].disconnected).toBe(true)
+        })
     })
 })

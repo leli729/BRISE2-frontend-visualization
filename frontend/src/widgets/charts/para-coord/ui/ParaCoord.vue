@@ -37,14 +37,17 @@ useChartRender({
     ],
     render,
     active: () => props.active,
+    drawOnlyInView: true,
     minIntervalMs: CLIENT_REDRAW_INTERVAL_MS
 })
 </script>
 
 
 
+<!-- min-height: the height of Plotly's default plot, so a chart that is not drawn (not in view yet, or released) keeps its place -->
 <template>
   <div
     ref="paraCoord"
+    style="min-height: 450px"
   />
 </template>

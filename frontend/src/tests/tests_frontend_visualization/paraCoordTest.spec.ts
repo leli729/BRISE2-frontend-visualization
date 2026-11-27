@@ -6,6 +6,7 @@ import { ref, shallowRef } from 'vue'
 import { ParaCoord } from '../../widgets/charts/para-coord'
 import type { PlotlyInstance } from '../../widgets/charts/model/chart.types'
 import { regionOf, specsByName as fixtureSpecsByName } from './searchSpaceFixture'
+import { installIntersectionObserver, uninstallIntersectionObserver, setInView } from './intersectionObserverStub'
 
 const { renderParaCoordMock } = vi.hoisted(() => ({
     renderParaCoordMock: vi.fn()
@@ -45,11 +46,13 @@ describe('Parallel Coordinates', () => {
 
         allRes.value = []
         plotlyInstance.value = { react: vi.fn(), purge: vi.fn() }
-
+        // the panel is observed: by default it is reported in view as soon as it is mounted
+        installIntersectionObserver()
     })
 
     afterEach(() => {
         vi.useRealTimers()
+        uninstallIntersectionObserver()
     })
 
     // every mounted component keeps its watchers alive until it's unmounted, and they all share
@@ -87,6 +90,33 @@ describe('Parallel Coordinates', () => {
 
         expect(renderParaCoordMock).toHaveBeenCalledTimes(1)
         expect(renderParaCoordMock.mock.calls[0][2]).toHaveLength(1)
+    })
+
+    it('draws nothing until the panel enters the view', async () => {
+        installIntersectionObserver({ reportOnObserve: false })
+        const wrapper = mountComponent()
+        await settle()
+        expect(renderParaCoordMock).not.toHaveBeenCalled()
+
+        setInView(wrapper.element, true)
+        await settle()
+
+        expect(renderParaCoordMock).toHaveBeenCalledTimes(1)
+    })
+
+    it('purges the panel when it leaves the view, and draws it again when it comes back', async () => {
+        const wrapper = mountComponent()
+        await settle()
+        expect(renderParaCoordMock).toHaveBeenCalledTimes(1)
+
+        setInView(wrapper.element, false)
+        await settle()
+        expect(plotlyInstance.value?.purge).toHaveBeenCalledWith(wrapper.element)
+
+        setInView(wrapper.element, true)
+        await settle()
+
+        expect(renderParaCoordMock).toHaveBeenCalledTimes(2)
     })
 
     it('rerenders when allRes changes', async () => {
