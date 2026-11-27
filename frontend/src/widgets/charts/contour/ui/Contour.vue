@@ -23,13 +23,18 @@ const props = withDefaults(defineProps<{
     active?: boolean
 }>(), { active: true })
 
-async function render(isMounted: () => boolean) {
+async function render(canDraw: () => boolean) {
     // Availability of Contour Plot currently not defined correctly by feature model. Therefore checking here if 2 valid HPs are available.
     // This check can be deleted once the constraint is implemented correctly in the feature model.
     if (!props.contourParam1 || !props.contourParam2 || props.contourParam1 === "" || props.contourParam2 === "") {
         return
     }
     const trials = trialsWithParameters(allRes.value, [props.contourParam1, props.contourParam2])
+    // main-node returns the empty result below two trials: no request for it
+    if (trials.length < 2) {
+        renderContour(plotlyInstance.value!, contour.value!, {}, specsByName.value)
+        return
+    }
     const result = await MainClientApi.calculatePlot(
         "contour",
         {
@@ -40,8 +45,8 @@ async function render(isMounted: () => boolean) {
         }
     )
 
-    // the chart may have been unmounted while the request was in flight
-    if (!isMounted()) return
+    // the chart may have been unmounted, or stopped being shown, while the request was in flight
+    if (!canDraw()) return
     renderContour(plotlyInstance.value!, contour.value!, result, specsByName.value)
 }
 

@@ -27,6 +27,9 @@ const { renderContourMock } = vi.hoisted(() => ({
 
 const allRes = shallowRef<any[]>([])
 
+// a trial with both parameters of the plot; the plot service needs two of them
+const trial = (frequency: number, threads: number) => ({ configurations: { frequency, threads }, results: { runtime: 100 } })
+
 const specsByName = ref(fixtureSpecsByName)
 
 const plotlyInstance = ref({ react: vi.fn(), purge: vi.fn() })
@@ -138,18 +141,8 @@ describe('Contour Plot', () => {
 
         await settle()
 
-            allRes.value = [
-                {
-                    configurations: {
-                        frequency: 50,
-                        threads: 4
-                    },
-                    results: [123.4],
-                    time: '10m 20s',
-                    'measured points': 1
-                }
-            ]
-        
+        allRes.value = [trial(50, 4), trial(60, 8)]
+
         await settle()
 
         expect(renderContourMock).toHaveBeenCalledWith(
@@ -163,7 +156,7 @@ describe('Contour Plot', () => {
     it('draws nothing while inactive, and once with the latest data when it turns active', async () => {
         const wrapper = mountComponent({ active: false })
         await settle()
-        allRes.value = [...allRes.value, { configurations: { frequency: 60, threads: 8 }, results: [100] }]
+        allRes.value = [trial(50, 4), trial(60, 8)]
         await settle()
         expect(calculatePlotMock).not.toHaveBeenCalled()
         expect(renderContourMock).not.toHaveBeenCalled()
@@ -173,23 +166,18 @@ describe('Contour Plot', () => {
 
         expect(calculatePlotMock).toHaveBeenCalledTimes(1)
         expect(renderContourMock).toHaveBeenCalledTimes(1)
-        expect(calculatePlotMock.mock.calls[0][1].trials).toHaveLength(1)
+        expect(calculatePlotMock.mock.calls[0][1].trials).toHaveLength(2)
     })
 
     it('rerenders when allRes changes', async () => {
+        allRes.value = [trial(50, 4)]
         mountComponent()
 
         await settle()
-
         const callsBeforeChange = calculatePlotMock.mock.calls.length
 
-        allRes.value = [...allRes.value, {
-            configurations: {
-                frequency: 60,
-                threads: 8
-            },
-            results: [100]
-        }]
+        // the second trial: the plot service needs two
+        allRes.value = [...allRes.value, trial(60, 8)]
 
         await settle()
 
@@ -198,6 +186,7 @@ describe('Contour Plot', () => {
     })
 
     it('rerenders when contourParam1 changes', async () => {
+        allRes.value = [trial(50, 4), trial(60, 8)]
         const wrapper = mountComponent()
 
         await settle()
@@ -225,6 +214,7 @@ describe('Contour Plot', () => {
     })
 
     it('rerenders when contourParam2 changes', async () => {
+        allRes.value = [trial(50, 4), trial(60, 8)]
         const wrapper = mountComponent()
 
         await settle()
@@ -252,6 +242,7 @@ describe('Contour Plot', () => {
     })
 
     it('rerenders when contourObjective changes', async () => {
+        allRes.value = [trial(50, 4), trial(60, 8)]
         const wrapper = mountComponent()
 
         await settle()
@@ -287,15 +278,7 @@ describe('Contour Plot', () => {
 
         const wrapper = mountComponent()
 
-         allRes.value = [...allRes.value, {
-            configurations: {
-                frequency: 50,
-                threads: 4
-            },
-            results: [100],
-            time: '10m 20s',
-            'measured points': 1
-        }]
+        allRes.value = [trial(50, 4), trial(60, 8)]
 
         await settle()
 
@@ -312,12 +295,37 @@ describe('Contour Plot', () => {
 
         await settle()
 
-        const active = { configurations: { frequency: 60, threads: 8 }, results: { runtime: 100 } }
+        const active = [trial(60, 8), trial(50, 4)]
         const inactive = { configurations: { frequency: 50 }, results: { runtime: 90 } }
-        allRes.value = [active, inactive]
+        allRes.value = [active[0], inactive, active[1]]
 
         await settle()
 
-        expect(calculatePlotMock.mock.lastCall?.[1].trials).toEqual([active])
+        expect(calculatePlotMock.mock.lastCall?.[1].trials).toEqual(active)
+    })
+
+    it.each([0, 1])('sends no request with %i trial(s) that have both parameters, and gives the renderer the empty result', async (count) => {
+        // a trial without one of the parameters does not count
+        allRes.value = [trial(50, 4), trial(60, 8)].slice(0, count).concat({ configurations: { frequency: 70 }, results: { runtime: 90 } } as any)
+        const wrapper = mountComponent()
+
+        await settle()
+
+        expect(calculatePlotMock).not.toHaveBeenCalled()
+        expect(renderContourMock).toHaveBeenLastCalledWith(plotlyInstance.value, wrapper.find('div').element, {}, specsByName.value)
+    })
+
+    it('draws nothing when the reply arrives after the chart stopped being shown', async () => {
+        allRes.value = [trial(50, 4), trial(60, 8)]
+        let reply: () => void = () => {}
+        calculatePlotMock.mockReturnValueOnce(new Promise(resolve => { reply = () => resolve(result) }))
+        const wrapper = mountComponent()
+        await settle()
+
+        await wrapper.setProps({ active: false })
+        reply()
+        await settle()
+
+        expect(renderContourMock).not.toHaveBeenCalled()
     })
 })

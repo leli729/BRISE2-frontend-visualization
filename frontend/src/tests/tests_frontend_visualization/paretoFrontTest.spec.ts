@@ -1,4 +1,4 @@
-import { mount, enableAutoUnmount } from '@vue/test-utils'
+import { mount, enableAutoUnmount, flushPromises } from '@vue/test-utils'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { settle } from './chartTiming'
 import { createPinia, setActivePinia } from 'pinia'
@@ -249,21 +249,62 @@ describe('Pareto Front', () => {
         )
     })
 
-    it('rerenders when onlyShowParetoFront changes', async () => {
-        const wrapper = mountComponent()
+    describe('the "show only Pareto front" switch', () => {
+        const trials = [
+            { configurations: { frequency: 50, threads: 4 }, results: [100, 150] },
+            { configurations: { frequency: 60, threads: 8 }, results: [120, 160] }
+        ]
 
-        await settle()
+        it('redraws at once from the last reply, without a request', async () => {
+            // the reply to the request of the mount, and the later one, which is the last
+            calculatePlotMock.mockResolvedValueOnce({ ...result, all_points: [] }).mockResolvedValue(result)
+            const wrapper = mountComponent()
+            await settle()
+            allRes.value = trials
+            await flushPromises()
+            expect(renderParetoFrontMock).toHaveBeenLastCalledWith(plotlyInstance.value, wrapper.find('div').element, result, false)
+            const requests = calculatePlotMock.mock.calls.length
+            const drawings = renderParetoFrontMock.mock.calls.length
 
-        const callsBeforeChange = calculatePlotMock.mock.calls.length
+            // the drawing above started a new interval: the switch does not wait for it
+            await wrapper.setProps({ onlyShowParetoFront: true })
+            await flushPromises()
 
-        await wrapper.setProps({
-            onlyShowParetoFront: true
+            expect(calculatePlotMock).toHaveBeenCalledTimes(requests)
+            expect(renderParetoFrontMock).toHaveBeenCalledTimes(drawings + 1)
+            expect(renderParetoFrontMock).toHaveBeenLastCalledWith(plotlyInstance.value, wrapper.find('div').element, result, true)
         })
 
-        await settle()
+        it('draws nothing before the first reply has arrived, and the reply is drawn with the switch as it is then', async () => {
+            let reply: () => void = () => {}
+            calculatePlotMock.mockReturnValue(new Promise(resolve => { reply = () => resolve(result) }))
+            const wrapper = mountComponent()
+            await settle()
 
-        expect(calculatePlotMock.mock.calls.length)
-            .toBeGreaterThan(callsBeforeChange)
+            await wrapper.setProps({ onlyShowParetoFront: true })
+            await settle()
+            expect(renderParetoFrontMock).not.toHaveBeenCalled()
+            expect(calculatePlotMock).toHaveBeenCalledTimes(1)
+
+            reply()
+            await settle()
+
+            expect(renderParetoFrontMock).toHaveBeenCalledTimes(1)
+            expect(renderParetoFrontMock).toHaveBeenLastCalledWith(plotlyInstance.value, wrapper.find('div').element, result, true)
+        })
+
+        it('draws nothing while the chart is inactive', async () => {
+            calculatePlotMock.mockResolvedValue(result)
+            const wrapper = mountComponent()
+            await settle()
+            await wrapper.setProps({ active: false })
+            const drawings = renderParetoFrontMock.mock.calls.length
+
+            await wrapper.setProps({ onlyShowParetoFront: true })
+            await settle()
+
+            expect(renderParetoFrontMock).toHaveBeenCalledTimes(drawings)
+        })
     })
 
     it('passes an empty result to render if result is empty', async () => {
@@ -297,5 +338,18 @@ describe('Pareto Front', () => {
             emptyResult,
             false
         )
+    })
+
+    it('draws nothing when the reply arrives after the chart stopped being shown', async () => {
+        let reply: () => void = () => {}
+        calculatePlotMock.mockReturnValueOnce(new Promise(resolve => { reply = () => resolve(result) }))
+        const wrapper = mountComponent()
+        await settle()
+
+        await wrapper.setProps({ active: false })
+        reply()
+        await settle()
+
+        expect(renderParetoFrontMock).not.toHaveBeenCalled()
     })
 })

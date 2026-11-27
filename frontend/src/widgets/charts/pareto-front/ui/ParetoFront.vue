@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { usePlotStore } from '../../../../entities/main/model/plot.store'
 import { renderParetoFront } from '../render'
 import { storeToRefs } from 'pinia'
@@ -20,7 +20,10 @@ const props = withDefaults(defineProps<{
     active?: boolean
 }>(), { active: true })
 
-async function render(isMounted: () => boolean) {
+// the last reply of main-node: the switch redraws from it, as it only chooses which of its points are shown
+let lastReply: any = null
+
+async function render(canDraw: () => boolean) {
     const result = await MainClientApi.calculatePlot(
         "pareto_front",
         {
@@ -30,8 +33,9 @@ async function render(isMounted: () => boolean) {
         }
     )
 
-    // the chart may have been unmounted while the request was in flight
-    if (!isMounted()) return
+    // the chart may have been unmounted, or stopped being shown, while the request was in flight
+    if (!canDraw()) return
+    lastReply = result
     renderParetoFront(plotlyInstance.value!, paretofront.value!, result, props.onlyShowParetoFront)
 }
 
@@ -41,12 +45,18 @@ useChartRender({
     sources: [
         allRes,
         () => props.paretoObjective1,
-        () => props.paretoObjective2,
-        () => props.onlyShowParetoFront
+        () => props.paretoObjective2
     ],
     render,
     active: () => props.active,
     minIntervalMs: PLOT_REQUEST_INTERVAL_MS
+})
+
+// the switch is no source of the render, which would send a request: it redraws at once from the last reply, when
+// there is one and the chart is shown
+watch(() => props.onlyShowParetoFront, () => {
+    if (!props.active || !lastReply || !plotlyInstance.value || !paretofront.value) return
+    renderParetoFront(plotlyInstance.value, paretofront.value, lastReply, props.onlyShowParetoFront)
 })
 </script>
 

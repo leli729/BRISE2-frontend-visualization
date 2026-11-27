@@ -182,12 +182,12 @@ describe('useChartRender', () => {
         expect(plotly.value.purge).toHaveBeenCalledWith(element)
     })
 
-    it('tells a drawing that resumes after unmount that the chart is gone', async () => {
+    it('tells a drawing that resumes after unmount that it can no longer draw', async () => {
         let resume: () => void = () => {}
-        let mountedWhenResumed: boolean | undefined
-        const { wrapper } = mountChart(async (isMounted) => {
+        let canDrawWhenResumed: boolean | undefined
+        const { wrapper } = mountChart(async (canDraw) => {
             await new Promise<void>(resolve => { resume = resolve })
-            mountedWhenResumed = isMounted()
+            canDrawWhenResumed = canDraw()
         })
         await flushPromises()
 
@@ -195,7 +195,33 @@ describe('useChartRender', () => {
         resume()
         await flushPromises()
 
-        expect(mountedWhenResumed).toBe(false)
+        expect(canDrawWhenResumed).toBe(false)
+    })
+
+    it('tells a drawing that resumes after the chart stopped being shown that it can not draw, and draws once more when it is shown again', async () => {
+        const canDrawWhenResumed: boolean[] = []
+        let resume: () => void = () => {}
+        const { drawing } = mountChart(async (canDraw) => {
+            await new Promise<void>(resolve => { resume = resolve })
+            canDrawWhenResumed.push(canDraw())
+        })
+        await flushPromises()
+        expect(drawing).toHaveBeenCalledTimes(1)
+
+        active.value = false
+        await flushPromises()
+        resume()
+        await flushPromises()
+        expect(canDrawWhenResumed).toEqual([false])
+
+        vi.advanceTimersByTime(4 * INTERVAL_MS)
+        active.value = true
+        await flushPromises()
+        expect(drawing).toHaveBeenCalledTimes(2)
+        resume()
+        await flushPromises()
+
+        expect(canDrawWhenResumed).toEqual([false, true])
     })
 
     describe('draw only in view', () => {

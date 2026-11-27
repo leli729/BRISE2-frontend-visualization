@@ -22,9 +22,14 @@ const props = withDefaults(defineProps<{
     active?: boolean
 }>(), { active: true })
 
-async function render(isMounted: () => boolean) {
+async function render(canDraw: () => boolean) {
     // the plot service takes a requested parameter that a trial lacks as inactive in it
     const trials = trialsOfRegion(allRes.value, props.region)
+    // main-node returns the empty result below two trials: no request for it
+    if (trials.length < 2) {
+        renderHypImp(plotlyInstance.value!, hypimp.value!, {})
+        return
+    }
     const result = await MainClientApi.calculatePlot(
         "hyperparameter_importances",
         {
@@ -34,8 +39,8 @@ async function render(isMounted: () => boolean) {
         }
     )
 
-    // the chart may have been unmounted while the request was in flight
-    if (!isMounted()) return
+    // the chart may have been unmounted, or stopped being shown, while the request was in flight
+    if (!canDraw()) return
     renderHypImp(plotlyInstance.value!, hypimp.value!, result)
 }
 

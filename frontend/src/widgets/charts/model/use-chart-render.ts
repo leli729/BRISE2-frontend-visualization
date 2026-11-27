@@ -17,9 +17,9 @@ interface ChartRender {
     plotly: Ref<PlotlyInstance | null>
     // what the render reads: a change of any marks the chart as needing a render; watched shallowly
     sources: WatchSource[]
-    // draws the chart; `isMounted` tells an async render, after an await, that the chart is gone
+    // draws the chart; `canDraw` tells an async render, after an await, whether the chart is still mounted and shown
     // eslint-disable-next-line no-unused-vars -- the name documents the parameter
-    render: (isMounted: () => boolean) => void | Promise<void>
+    render: (canDraw: () => boolean) => void | Promise<void>
     // a chart that is not active does no work and draws once, with the latest data, when it turns active
     active: () => boolean
     // draw only while the element is in view, and release the chart's WebGL contexts when it leaves: a chart of many
@@ -67,7 +67,7 @@ export function useChartRender({ element, plotly, sources, render, active, drawO
         needsRender = false
         lastStart = Date.now()
         try {
-            await render(() => mounted)
+            await render(() => mounted && shown())
         } catch (error) {
             console.error(error)
         } finally {
@@ -96,7 +96,11 @@ export function useChartRender({ element, plotly, sources, render, active, drawO
 
     watch(shown, (isShown) => {
         if (isShown) schedule()
-        else if (drawOnlyInView) release()
+        else {
+            // a drawing in flight will not draw (`canDraw`): the chart needs another one when it is shown again
+            if (running) needsRender = true
+            if (drawOnlyInView) release()
+        }
     })
 
     onMounted(() => {
