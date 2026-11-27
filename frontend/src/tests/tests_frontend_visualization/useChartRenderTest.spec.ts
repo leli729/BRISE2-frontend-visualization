@@ -2,6 +2,7 @@ import { mount, flushPromises, enableAutoUnmount } from '@vue/test-utils'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { defineComponent, h, ref, shallowRef } from 'vue'
 import { useChartRender } from '../../widgets/charts/model/use-chart-render'
+import { resizeTo, createdResizeObservers } from '../setup/resizeObserver'
 import { installIntersectionObserver, uninstallIntersectionObserver, setInView, createdObservers } from './intersectionObserverStub'
 
 const INTERVAL_MS = 250
@@ -40,7 +41,7 @@ function mountChart(render: Drawing = () => { seen.push(data.value) }, options: 
 describe('useChartRender', () => {
     beforeEach(() => {
         vi.useFakeTimers()
-        plotly.value = { react: vi.fn(), purge: vi.fn() }
+        plotly.value = { react: vi.fn(), purge: vi.fn(), Plots: { resize: vi.fn(() => Promise.resolve()) } }
         data.value = 0
         active.value = true
         seen = []
@@ -374,6 +375,157 @@ describe('useChartRender', () => {
             wrapper.unmount()
 
             expect(createdObservers()[0].disconnected).toBe(true)
+        })
+    })
+
+    describe('follows its width', () => {
+        const resize = () => plotly.value.Plots.resize
+
+        // a chart that has been drawn, with the width the observer reports first
+        async function drawnChartOfWidth(width: number) {
+            const chart = mountChart()
+            await flushPromises()
+            expect(chart.drawing).toHaveBeenCalledTimes(1)
+            resizeTo(chart.wrapper.element, width)
+            return chart
+        }
+
+        it('lays the plot out again when the width of a drawn, shown chart changes', async () => {
+            const { wrapper } = await drawnChartOfWidth(800)
+            expect(resize()).not.toHaveBeenCalled()
+
+            resizeTo(wrapper.element, 600)
+
+            expect(resize()).toHaveBeenCalledTimes(1)
+            expect(resize()).toHaveBeenCalledWith(wrapper.element)
+        })
+
+        it('does nothing when the width stays, or when only the height changes', async () => {
+            const { wrapper } = await drawnChartOfWidth(800)
+
+            resizeTo(wrapper.element, 800)
+            resizeTo(wrapper.element, 800, 300)
+
+            expect(resize()).not.toHaveBeenCalled()
+        })
+
+        it('ignores a width of 0 (a hidden chart), and does nothing when the width returns to the one it had', async () => {
+            const { wrapper } = await drawnChartOfWidth(800)
+
+            resizeTo(wrapper.element, 0)
+            resizeTo(wrapper.element, 800)
+
+            expect(resize()).not.toHaveBeenCalled()
+        })
+
+        it('does not resize a chart that was never drawn', async () => {
+            active.value = false
+            const { wrapper, drawing } = mountChart()
+            await flushPromises()
+            expect(drawing).not.toHaveBeenCalled()
+
+            resizeTo(wrapper.element, 800)
+            resizeTo(wrapper.element, 600)
+
+            expect(resize()).not.toHaveBeenCalled()
+        })
+
+        it('does not resize a chart while it is not shown', async () => {
+            const { wrapper } = await drawnChartOfWidth(800)
+            active.value = false
+            await flushPromises()
+
+            resizeTo(wrapper.element, 600)
+
+            expect(resize()).not.toHaveBeenCalled()
+        })
+
+        it('resizes the chart once when it is shown again, if its new width was reported while it was not shown', async () => {
+            const { wrapper } = await drawnChartOfWidth(800)
+            active.value = false
+            await flushPromises()
+            resizeTo(wrapper.element, 600)
+            expect(resize()).not.toHaveBeenCalled()
+
+            active.value = true
+            await flushPromises()
+
+            expect(resize()).toHaveBeenCalledTimes(1)
+        })
+
+        it('resizes the chart once when it is shown again, if its new width is reported after it is shown', async () => {
+            const { wrapper } = await drawnChartOfWidth(800)
+            active.value = false
+            await flushPromises()
+            // the browser reports the hidden size, then the new one once it is shown
+            resizeTo(wrapper.element, 0)
+            active.value = true
+            await flushPromises()
+            expect(resize()).not.toHaveBeenCalled()
+
+            resizeTo(wrapper.element, 500)
+
+            expect(resize()).toHaveBeenCalledTimes(1)
+        })
+
+        it('takes a width reported before the first drawing as the starting width', async () => {
+            active.value = false
+            const { wrapper, drawing } = mountChart()
+            await flushPromises()
+            resizeTo(wrapper.element, 800)
+            active.value = true
+            await flushPromises()
+            expect(drawing).toHaveBeenCalledTimes(1)
+
+            resizeTo(wrapper.element, 600)
+
+            expect(resize()).toHaveBeenCalledTimes(1)
+        })
+
+        // a drawing lays the plot out at the container's width, so a resize on top of it would be redundant (that the
+        // drawing ends at that width is for a browser to show, see harness/web/check_resize.mjs)
+        it('does not resize a chart that is redrawn when it is shown again', async () => {
+            const { wrapper, drawing } = await drawnChartOfWidth(800)
+            active.value = false
+            await flushPromises()
+            // a width change pending while it is hidden
+            resizeTo(wrapper.element, 600)
+            vi.advanceTimersByTime(4 * INTERVAL_MS)
+            data.value = 1
+            await flushPromises()
+
+            active.value = true
+            await flushPromises()
+
+            expect(drawing).toHaveBeenCalledTimes(2)
+            expect(resize()).not.toHaveBeenCalled()
+        })
+
+        it('logs the rejection of a resize and carries on', async () => {
+            const error = new Error('Resize must be passed a displayed plot div element.')
+            plotly.value.Plots.resize.mockRejectedValue(error)
+            const logged = vi.spyOn(console, 'error').mockImplementation(() => {})
+            const { wrapper, drawing } = await drawnChartOfWidth(800)
+
+            resizeTo(wrapper.element, 600)
+            await flushPromises()
+
+            expect(logged).toHaveBeenCalledWith(error)
+            // the chart still draws
+            vi.advanceTimersByTime(4 * INTERVAL_MS)
+            data.value = 1
+            await flushPromises()
+            expect(drawing).toHaveBeenCalledTimes(2)
+            logged.mockRestore()
+        })
+
+        it('stops observing when it is unmounted', async () => {
+            const { wrapper } = await drawnChartOfWidth(800)
+            expect(createdResizeObservers()).toHaveLength(1)
+
+            wrapper.unmount()
+
+            expect(createdResizeObservers()[0].disconnected).toBe(true)
         })
     })
 })

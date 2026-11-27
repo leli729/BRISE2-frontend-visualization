@@ -54,7 +54,8 @@ export default defineConfig({
         extends: true,
         test: {
           name: 'unit',
-          environment: 'jsdom'
+          environment: 'jsdom',
+          setupFiles: ['./src/tests/setup/resizeObserver.ts']
         }
       }
     ]

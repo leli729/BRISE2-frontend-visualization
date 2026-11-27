@@ -1,6 +1,6 @@
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { Ref, WatchSource } from 'vue'
-import type { PlotlyInstance } from './chart.types'
+import type { ResizablePlotly } from './chart.types'
 
 // the shortest time between the starts of two renders of one chart
 export const CLIENT_REDRAW_INTERVAL_MS = 250
@@ -14,7 +14,7 @@ interface ChartRender {
     // the chart's element
     element: Ref<HTMLElement | null>
     // the Plotly instance, null until it has loaded
-    plotly: Ref<PlotlyInstance | null>
+    plotly: Ref<ResizablePlotly | null>
     // what the render reads: a change of any marks the chart as needing a render; watched shallowly
     sources: WatchSource[]
     // draws the chart; `canDraw` tells an async render, after an await, whether the chart is still mounted and shown
@@ -32,13 +32,19 @@ interface ChartRender {
 // that follow within the interval as one render at its end, with the latest data), never two renders of the chart at
 // the same time, and only while it is active (and in view, with `drawOnlyInView`) and Plotly is ready. With `drawOnlyInView`
 // a chart that has been drawn is released when it stops being shown: purged, its WebGL contexts released, and it draws
-// again once shown; without it, an inactive chart keeps its last drawing. Purges the chart on unmount.
+// again once shown; without it, an inactive chart keeps its last drawing. Follows the element's width: a drawn, shown
+// chart is laid out again when it changes (a hidden one, once it is shown). Purges the chart on unmount.
 export function useChartRender({ element, plotly, sources, render, active, drawOnlyInView = false, minIntervalMs }: ChartRender) {
     let mounted = false
     let needsRender = true
     let running = false
     let drawn = false
     let observer: IntersectionObserver | null = null
+    let resizeObserver: ResizeObserver | null = null
+    // the last width of the element seen (a width of 0 is a hidden element), and whether it changed since the plot was
+    // laid out
+    let lastWidth: number | null = null
+    let resizeNeeded = false
     // what the observer last reported; false until its first report
     const inView = ref(false)
     let lastStart = -Infinity
@@ -64,6 +70,8 @@ export function useChartRender({ element, plotly, sources, render, active, drawO
     async function run() {
         running = true
         drawn = true
+        // a drawing lays the plot out at the element's current width
+        resizeNeeded = false
         needsRender = false
         lastStart = Date.now()
         try {
@@ -89,14 +97,24 @@ export function useChartRender({ element, plotly, sources, render, active, drawO
         needsRender = true
     }
 
+    // lays the plot out at the element's width again, without drawing it anew
+    function resizeToElement() {
+        if (!resizeNeeded || !drawn || !shown() || !plotly.value || !element.value) return
+        resizeNeeded = false
+        // Plotly returns a promise, which its types declare as void; it rejects for an element that is hidden itself
+        Promise.resolve(plotly.value.Plots.resize(element.value)).catch(error => console.error(error))
+    }
+
     watch([...sources, plotly], () => {
         needsRender = true
         schedule()
     })
 
     watch(shown, (isShown) => {
-        if (isShown) schedule()
-        else {
+        if (isShown) {
+            schedule()
+            resizeToElement()
+        } else {
             // a drawing in flight will not draw (`canDraw`): the chart needs another one when it is shown again
             if (running) needsRender = true
             if (drawOnlyInView) release()
@@ -111,12 +129,22 @@ export function useChartRender({ element, plotly, sources, render, active, drawO
             }, { rootMargin: IN_VIEW_MARGIN })
             observer.observe(element.value)
         }
+        resizeObserver = new ResizeObserver(entries => {
+            const width = entries[entries.length - 1].contentRect.width
+            // the element of a hidden chart has no width
+            if (width <= 0) return
+            if (lastWidth !== null && width !== lastWidth) resizeNeeded = true
+            lastWidth = width
+            resizeToElement()
+        })
+        if (element.value) resizeObserver.observe(element.value)
         schedule()
     })
 
     onBeforeUnmount(() => {
         mounted = false
         observer?.disconnect()
+        resizeObserver?.disconnect()
         if (timer !== null) clearTimeout(timer)
         timer = null
         if (element.value && plotly.value) {
