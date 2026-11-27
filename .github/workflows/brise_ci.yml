@@ -43,7 +43,7 @@ jobs:
           python-version: 3.12
       # Set up Miniconda
       - name: Set up Miniconda
-        uses: conda-incubator/setup-miniconda@v2
+        uses: conda-incubator/setup-miniconda@v4
         with:
           activate-environment: brise-261
           environment-file: ./main_node/environment.yml
