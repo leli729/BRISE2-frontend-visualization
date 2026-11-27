@@ -6,11 +6,12 @@ import type { SearchSpaceRegion } from '../../../../entities/experiment/model/ex
 
 defineOptions({ name: 'SliceRegionPanel' })
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
     region: SearchSpaceRegion
     showTitle: boolean
     sliceObjective: string
-}>()
+    active?: boolean
+}>(), { active: true })
 
 const regionParameters = computed(() => props.region.Parameters.map(parameter => parameter.Name))
 
@@ -42,6 +43,7 @@ watch(
       class="user-input"
     />
     <Slice
+      :active="active"
       :region="region"
       :slice-param="sliceParam"
       :slice-objective="sliceObjective"

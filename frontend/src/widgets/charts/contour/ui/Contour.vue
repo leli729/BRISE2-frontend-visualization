@@ -16,11 +16,12 @@ const { allRes } = storeToRefs(plotStore)
 const { specsByName, plotlyInstance } = storeToRefs(store)
 const contour = ref<HTMLElement | null>(null)
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
     contourParam1: string
     contourParam2: string
     contourObjective: string
-}>()
+    active?: boolean
+}>(), { active: true })
 
 async function render(isMounted: () => boolean) {
     // Availability of Contour Plot currently not defined correctly by feature model. Therefore checking here if 2 valid HPs are available.
@@ -54,7 +55,7 @@ useChartRender({
         () => props.contourObjective
     ],
     render,
-    active: () => true,
+    active: () => props.active,
     minIntervalMs: PLOT_REQUEST_INTERVAL_MS
 })
 </script>

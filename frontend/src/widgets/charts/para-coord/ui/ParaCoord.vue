@@ -13,11 +13,12 @@ const plotStore = usePlotStore()
 const { specsByName, plotlyInstance } = storeToRefs(store)
 const { allRes } = storeToRefs(plotStore)
 const paraCoord = ref<HTMLElement | null>(null)
-const props = defineProps<{
+const props = withDefaults(defineProps<{
     region: SearchSpaceRegion
     paraCoordParams: string[]
     paraCoordObjective: string
-}>()
+    active?: boolean
+}>(), { active: true })
 
 function render() {
     // a trial of the region without a selected parameter is drawn as inactive in it
@@ -35,7 +36,7 @@ useChartRender({
         () => props.paraCoordObjective
     ],
     render,
-    active: () => true,
+    active: () => props.active,
     minIntervalMs: CLIENT_REDRAW_INTERVAL_MS
 })
 </script>

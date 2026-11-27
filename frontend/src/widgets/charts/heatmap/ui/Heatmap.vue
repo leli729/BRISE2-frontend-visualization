@@ -18,12 +18,13 @@ const { allRes, solution } = storeToRefs(plotStore)
 const { specsByName, plotlyInstance } = storeToRefs(store)
 const map = ref<HTMLElement | null>(null)
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
     region: SearchSpaceRegion
     heatmapParam1: string
     heatmapParam2: string
     heatmapObjective: string
-}>()
+    active?: boolean
+}>(), { active: true })
 
 // values that possible to use in template
 const colors = Color
@@ -52,7 +53,7 @@ useChartRender({
         () => theme.value.color
     ],
     render,
-    active: () => true,
+    active: () => props.active,
     minIntervalMs: CLIENT_REDRAW_INTERVAL_MS
 })
 </script>

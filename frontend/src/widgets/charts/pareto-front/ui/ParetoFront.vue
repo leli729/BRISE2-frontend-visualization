@@ -13,11 +13,12 @@ const { allRes } = storeToRefs(plotStore)
 const { plotlyInstance } = storeToRefs(store)
 const paretofront = ref<HTMLElement | null>(null)
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
     paretoObjective1: string
     paretoObjective2: string
     onlyShowParetoFront: boolean
-}>()
+    active?: boolean
+}>(), { active: true })
 
 async function render(isMounted: () => boolean) {
     const result = await MainClientApi.calculatePlot(
@@ -44,7 +45,7 @@ useChartRender({
         () => props.onlyShowParetoFront
     ],
     render,
-    active: () => true,
+    active: () => props.active,
     minIntervalMs: PLOT_REQUEST_INTERVAL_MS
 })
 </script>

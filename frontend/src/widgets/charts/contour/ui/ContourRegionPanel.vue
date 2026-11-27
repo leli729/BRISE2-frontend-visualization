@@ -7,11 +7,12 @@ import type { SearchSpaceRegion } from '../../../../entities/experiment/model/ex
 
 defineOptions({ name: 'ContourRegionPanel' })
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
     region: SearchSpaceRegion
     showTitle: boolean
     contourObjective: string
-}>()
+    active?: boolean
+}>(), { active: true })
 
 // parameters of the region that can span a contour axis
 const contourParameterNames = computed(() =>
@@ -64,6 +65,7 @@ watch(
         class="user-input"
       />
       <Contour
+        :active="active"
         :contour-param1="contourParam1"
         :contour-param2="contourParam2"
         :contour-objective="contourObjective"

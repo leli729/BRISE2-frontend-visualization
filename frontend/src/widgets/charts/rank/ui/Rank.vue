@@ -16,12 +16,13 @@ const { allRes } = storeToRefs(plotStore)
 const { specsByName, plotlyInstance } = storeToRefs(store)
 const rank = ref<HTMLElement | null>(null)
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
     region: SearchSpaceRegion
     rankParam1: string
     rankParam2: string
     rankObjective: string
-}>()
+    active?: boolean
+}>(), { active: true })
 
 function render() {
     // a trial of the region without a selected parameter is drawn as inactive in it
@@ -39,7 +40,7 @@ useChartRender({
         () => props.rankObjective
     ],
     render,
-    active: () => true,
+    active: () => props.active,
     minIntervalMs: CLIENT_REDRAW_INTERVAL_MS
 })
 </script>

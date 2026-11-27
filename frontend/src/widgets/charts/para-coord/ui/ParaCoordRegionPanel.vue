@@ -6,11 +6,12 @@ import type { SearchSpaceRegion } from '../../../../entities/experiment/model/ex
 
 defineOptions({ name: 'ParaCoordRegionPanel' })
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
     region: SearchSpaceRegion
     showTitle: boolean
     paraCoordObjective: string
-}>()
+    active?: boolean
+}>(), { active: true })
 
 const regionParameters = computed(() => props.region.Parameters.map(parameter => parameter.Name))
 
@@ -59,6 +60,7 @@ watch(
       </v-list-item>
     </v-list>
     <ParaCoord
+      :active="active"
       :region="region"
       :para-coord-params="selectedParaCoordParams"
       :para-coord-objective="paraCoordObjective"

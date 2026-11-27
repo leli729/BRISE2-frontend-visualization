@@ -11,9 +11,10 @@ const plotStore = usePlotStore()
 const { experiment_description, plotlyInstance } = storeToRefs(store)
 const { allRes, solution } = storeToRefs(plotStore)
 const optHist = ref<HTMLElement | null>(null)
-const props = defineProps<{
+const props = withDefaults(defineProps<{
     optHistObjective: string
-}>();
+    active?: boolean
+}>(), { active: true })
 
 function render() {
     if (!experiment_description.value) 
@@ -30,7 +31,7 @@ useChartRender({
         () => props.optHistObjective
     ],
     render,
-    active: () => true,
+    active: () => props.active,
     minIntervalMs: CLIENT_REDRAW_INTERVAL_MS
 })
 </script>

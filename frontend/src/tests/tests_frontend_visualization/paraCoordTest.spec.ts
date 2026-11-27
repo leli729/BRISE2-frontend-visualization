@@ -60,12 +60,13 @@ describe('Parallel Coordinates', () => {
         wrapper = null
     })
 
-   const mountComponent = () => {
+   const mountComponent = (extraProps: { active?: boolean } = {}) => {
         wrapper = mount(ParaCoord, {
             props: {
                 region: regionOf('frequency', 'threads'),
                 paraCoordObjective: 'runtime',
-                paraCoordParams: ['frequency, threads']
+                paraCoordParams: ['frequency, threads'],
+                ...extraProps
             },
             global: {
                 plugins: [createPinia()]
@@ -73,6 +74,20 @@ describe('Parallel Coordinates', () => {
         })
         return wrapper
     }
+
+    it('draws nothing while inactive, and once with the latest data when it turns active', async () => {
+        const wrapper = mountComponent({ active: false })
+        await settle()
+        allRes.value = [...allRes.value, { configurations: { frequency: 60, threads: 8 }, results: { runtime: 100 } }]
+        await settle()
+        expect(renderParaCoordMock).not.toHaveBeenCalled()
+
+        await wrapper.setProps({ active: true })
+        await settle()
+
+        expect(renderParaCoordMock).toHaveBeenCalledTimes(1)
+        expect(renderParaCoordMock.mock.calls[0][2]).toHaveLength(1)
+    })
 
     it('rerenders when allRes changes', async () => {
         mountComponent()

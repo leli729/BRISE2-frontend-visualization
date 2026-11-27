@@ -7,11 +7,12 @@ import type { SearchSpaceRegion } from '../../../../entities/experiment/model/ex
 
 defineOptions({ name: 'RankRegionPanel' })
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
     region: SearchSpaceRegion
     showTitle: boolean
     rankObjective: string
-}>()
+    active?: boolean
+}>(), { active: true })
 
 // parameters of the region that can span a rank axis
 const rankParameterNames = computed(() =>
@@ -68,6 +69,7 @@ watch(
         class="user-input"
       />
       <Rank
+        :active="active"
         :region="region"
         :rank-param1="rankParam1"
         :rank-param2="rankParam2"

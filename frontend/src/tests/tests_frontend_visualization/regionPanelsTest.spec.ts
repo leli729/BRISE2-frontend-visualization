@@ -287,3 +287,25 @@ describe('Region panels', () => {
         expect(wrapper.findComponent(RegionTitle).exists()).toBe(false)
     })
 })
+
+describe('Region panels give their chart whether it is active', () => {
+    const panels = [
+        ['rank', RankRegionPanel, Rank, regionA, { rankObjective: 'runtime' }],
+        ['slice', SliceRegionPanel, Slice, regionAB, { sliceObjective: 'runtime' }],
+        ['contour', ContourRegionPanel, Contour, regionA, { contourObjective: 'runtime' }],
+        ['heatmap', HeatmapRegionPanel, Heatmap, flatCategoricalRegion, { heatmapObjective: 'runtime' }],
+        ['parallel coordinates', ParaCoordRegionPanel, ParaCoord, regionA, { paraCoordObjective: 'runtime' }],
+        ['hyperparameter importances', HypImpRegionPanel, HypImp, regionA, { hypImpObjective: 'runtime' }]
+    ] as const
+
+    it.each(panels)('%s panel: active unless told otherwise, and following its own flag', async (_, panel, chart, region, objective) => {
+        const wrapper = mountPanel(panel, { region, showTitle: false, ...objective })
+        expect(wrapper.findComponent(chart).props('active')).toBe(true)
+
+        await wrapper.setProps({ active: false })
+        expect(wrapper.findComponent(chart).props('active')).toBe(false)
+
+        await wrapper.setProps({ active: true })
+        expect(wrapper.findComponent(chart).props('active')).toBe(true)
+    })
+})

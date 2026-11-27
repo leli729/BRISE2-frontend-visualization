@@ -7,11 +7,12 @@ import type { SearchSpaceRegion } from '../../../../entities/experiment/model/ex
 
 defineOptions({ name: 'HeatmapRegionPanel' })
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
     region: SearchSpaceRegion
     showTitle: boolean
     heatmapObjective: string
-}>()
+    active?: boolean
+}>(), { active: true })
 
 // parameters of the region that can span a heatmap axis: the categorical ones
 const heatmapParameterNames = computed(() =>
@@ -68,6 +69,7 @@ watch(
         class="user-input"
       />
       <Heatmap
+        :active="active"
         :region="region"
         :heatmap-param1="heatmapParam1"
         :heatmap-param2="heatmapParam2"

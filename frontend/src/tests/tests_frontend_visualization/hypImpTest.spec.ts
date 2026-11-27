@@ -68,12 +68,13 @@ describe('Hyperparameter Importances', () => {
         vi.useRealTimers()
     })
 
-    const mountComponent = () => {
+    const mountComponent = (extraProps: { active?: boolean } = {}) => {
         return mount(HypImp, {
             props: {
                 region: regionOf('frequency', 'threads'),
                 hypImpParams: ['frequency', 'threads'],
-                hypImpObjective: 'runtime'
+                hypImpObjective: 'runtime',
+                ...extraProps
             },
             global: {
                 plugins: [createPinia()]
@@ -139,6 +140,22 @@ describe('Hyperparameter Importances', () => {
             wrapper.find('div').element,
             result
         )
+    })
+
+    it('draws nothing while inactive, and once with the latest data when it turns active', async () => {
+        const wrapper = mountComponent({ active: false })
+        await settle()
+        allRes.value = [...allRes.value, { configurations: { frequency: 60, threads: 8 }, results: [100] }]
+        await settle()
+        expect(calculatePlotMock).not.toHaveBeenCalled()
+        expect(renderHypImpMock).not.toHaveBeenCalled()
+
+        await wrapper.setProps({ active: true })
+        await settle()
+
+        expect(calculatePlotMock).toHaveBeenCalledTimes(1)
+        expect(renderHypImpMock).toHaveBeenCalledTimes(1)
+        expect(calculatePlotMock.mock.calls[0][1].trials).toHaveLength(1)
     })
 
     it('rerenders when allRes changes', async () => {

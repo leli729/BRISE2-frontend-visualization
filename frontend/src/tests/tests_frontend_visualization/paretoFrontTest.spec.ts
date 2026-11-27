@@ -80,12 +80,13 @@ describe('Pareto Front', () => {
         vi.useRealTimers()
     })
 
-    const mountComponent = () => {
+    const mountComponent = (extraProps: { active?: boolean } = {}) => {
         return mount(ParetoFront, {
             props: {
                 paretoObjective1: 'energy',
                 paretoObjective2: 'runtime',
-                onlyShowParetoFront: false
+                onlyShowParetoFront: false,
+                ...extraProps
             },
             global: {
                 plugins: [createPinia()]
@@ -161,6 +162,22 @@ describe('Pareto Front', () => {
             result,
             false
         )
+    })
+
+    it('draws nothing while inactive, and once with the latest data when it turns active', async () => {
+        const wrapper = mountComponent({ active: false })
+        await settle()
+        allRes.value = [...allRes.value, { configurations: { frequency: 60, threads: 8 }, results: [100] }]
+        await settle()
+        expect(calculatePlotMock).not.toHaveBeenCalled()
+        expect(renderParetoFrontMock).not.toHaveBeenCalled()
+
+        await wrapper.setProps({ active: true })
+        await settle()
+
+        expect(calculatePlotMock).toHaveBeenCalledTimes(1)
+        expect(renderParetoFrontMock).toHaveBeenCalledTimes(1)
+        expect(calculatePlotMock.mock.calls[0][1].trials).toHaveLength(1)
     })
 
     it('rerenders when allRes changes', async () => {

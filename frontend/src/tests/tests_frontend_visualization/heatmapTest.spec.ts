@@ -74,12 +74,13 @@ describe('Heatmap', () => {
         vi.useRealTimers()
     })
 
-    const mountComponent = (region: SearchSpaceRegion = regionN01) => mount(Heatmap, {
+    const mountComponent = (region: SearchSpaceRegion = regionN01, extraProps: { active?: boolean } = {}) => mount(Heatmap, {
         props: {
             region,
             heatmapParam1: N1,
             heatmapParam2: M1,
-            heatmapObjective: 'runtime'
+            heatmapObjective: 'runtime',
+            ...extraProps
         },
         global: { plugins: [createPinia()] }
     })
@@ -125,6 +126,20 @@ describe('Heatmap', () => {
         await settle()
 
         expect(lastRender()[7]).toEqual(measuredN01)
+    })
+
+    it('draws nothing while inactive, and once with the latest data when it turns active', async () => {
+        const wrapper = mountComponent(regionN01, { active: false })
+        await settle()
+        allRes.value = [...allRes.value, measuredN01]
+        await settle()
+        expect(renderHeatmapMock).not.toHaveBeenCalled()
+
+        await wrapper.setProps({ active: true })
+        await settle()
+
+        expect(renderHeatmapMock).toHaveBeenCalledTimes(1)
+        expect(renderHeatmapMock.mock.calls[0][2]).toHaveLength(1)
     })
 
     it('rerenders when allRes changes', async () => {

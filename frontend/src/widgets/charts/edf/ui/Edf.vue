@@ -8,6 +8,10 @@ import { useChartRender, CLIENT_REDRAW_INTERVAL_MS } from '../../model/use-chart
 
 defineOptions({ name: 'EdfChart' })
 
+const props = withDefaults(defineProps<{
+    active?: boolean
+}>(), { active: true })
+
 const plotStore = usePlotStore()
 const store = useMainEventStore()
 const { allRes } = storeToRefs(plotStore)
@@ -27,7 +31,7 @@ useChartRender({
         allRes
     ],
     render,
-    active: () => true,
+    active: () => props.active,
     minIntervalMs: CLIENT_REDRAW_INTERVAL_MS
 })
 </script>

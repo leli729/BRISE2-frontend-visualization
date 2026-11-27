@@ -47,6 +47,11 @@ const selectedCharts = computed(() =>
   )
 )
 
+// a chart is shown when its tab is open and its checkbox is on; a chart that is not shown does no work
+function isShown(chart: string) {
+  return tab.value === 'charts' && visibleCharts.value.includes(chart)
+}
+
 // compute objectives of the experiment for dropdown options
 const objectiveNames = computed(() =>
     Object.keys(
@@ -342,7 +347,10 @@ watch(
                     hide-details
                     class="user-input"
                   />
-                  <OptHist :opt-hist-objective="selectedOptHistObjective" />
+                  <OptHist
+                    :active="isShown('Optimization History')"
+                    :opt-hist-objective="selectedOptHistObjective"
+                  />
                 </div>
               </v-col>
 
@@ -366,6 +374,7 @@ watch(
                   <HeatmapRegionPanel
                     v-for="(region, index) in regions"
                     :key="index"
+                    :active="isShown('Heatmap')"
                     :region="region"
                     :show-title="regions.length > 1"
                     :heatmap-objective="selectedSurfaceObjective"
@@ -393,6 +402,7 @@ watch(
                   <ParaCoordRegionPanel
                     v-for="(region, index) in regions"
                     :key="index"
+                    :active="isShown('Parallel Coordinates')"
                     :region="region"
                     :show-title="regions.length > 1"
                     :para-coord-objective="selectedParaCoordObjective"
@@ -420,6 +430,7 @@ watch(
                   <RankRegionPanel
                     v-for="(region, index) in regions"
                     :key="index"
+                    :active="isShown('Rank Plot')"
                     :region="region"
                     :show-title="regions.length > 1"
                     :rank-objective="selectedRankObjective"
@@ -447,6 +458,7 @@ watch(
                   <HypImpRegionPanel
                     v-for="(region, index) in regions"
                     :key="index"
+                    :active="isShown('Hyperparameter Importances')"
                     :region="region"
                     :show-title="regions.length > 1"
                     :hyp-imp-objective="selectedHypImpObjective"
@@ -474,6 +486,7 @@ watch(
                   <SliceRegionPanel
                     v-for="(region, index) in regions"
                     :key="index"
+                    :active="isShown('Slice Plot')"
                     :region="region"
                     :show-title="regions.length > 1"
                     :slice-objective="selectedSliceObjective"
@@ -501,6 +514,7 @@ watch(
                   <ContourRegionPanel
                     v-for="(region, index) in regions"
                     :key="index"
+                    :active="isShown('Contour Plot')"
                     :region="region"
                     :show-title="regions.length > 1"
                     :contour-objective="selectedSurfaceObjective"
@@ -542,6 +556,7 @@ watch(
                     class="user-input"
                   />
                   <ParetoFront
+                    :active="isShown('Pareto Front')"
                     :pareto-objective1="selectedParetoObjective1"
                     :pareto-objective2="selectedParetoObjective2"
                     :only-show-pareto-front="onlyShowParetoFront"
@@ -557,7 +572,7 @@ watch(
                 class="pr-2"
               >
                 <div class="chart-block chart-block--edf">
-                  <Edf />
+                  <Edf :active="isShown('EDF Plot')" />
                 </div>
               </v-col>
 

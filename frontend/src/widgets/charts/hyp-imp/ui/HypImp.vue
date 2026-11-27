@@ -15,11 +15,12 @@ const { allRes } = storeToRefs(plotStore)
 const { plotlyInstance } = storeToRefs(store)
 const hypimp = ref<HTMLElement | null>(null)
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
     region: SearchSpaceRegion
     hypImpParams: string[]
     hypImpObjective: string
-}>()
+    active?: boolean
+}>(), { active: true })
 
 async function render(isMounted: () => boolean) {
     // the plot service takes a requested parameter that a trial lacks as inactive in it
@@ -48,7 +49,7 @@ useChartRender({
         () => props.hypImpObjective
     ],
     render,
-    active: () => true,
+    active: () => props.active,
     minIntervalMs: PLOT_REQUEST_INTERVAL_MS
 })
 </script>

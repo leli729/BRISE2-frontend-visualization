@@ -1,4 +1,4 @@
-import { mount } from '@vue/test-utils'
+import { mount, enableAutoUnmount } from '@vue/test-utils'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { settle } from './chartTiming'
 import { createPinia, setActivePinia } from 'pinia'
@@ -50,6 +50,10 @@ vi.mock('../../widgets/charts/opt-hist/render', () => ({
     renderOptHist: renderOptHistMock
 }))
 
+// every mounted chart watches the module-level refs below until it is unmounted; a leftover one would draw into a later
+// test's expectations
+enableAutoUnmount(afterEach)
+
 describe('Optimization History', () => {
     beforeEach(() => {
         vi.useFakeTimers()
@@ -82,16 +86,31 @@ describe('Optimization History', () => {
         vi.useRealTimers()
     })
 
-   const mountComponent = () => {
+   const mountComponent = (extraProps: { active?: boolean } = {}) => {
         return mount(OptHist, {
             props: {
-                optHistObjective: 'runtime'
+                optHistObjective: 'runtime',
+                ...extraProps
             },
             global: {
                 plugins: [createPinia()]
             }
         })
     }
+
+    it('draws nothing while inactive, and once with the latest data when it turns active', async () => {
+        const wrapper = mountComponent({ active: false })
+        await settle()
+        allRes.value = [...allRes.value, { configurations: { frequency: 60, threads: 8 }, results: { runtime: 100 } }]
+        await settle()
+        expect(renderOptHistMock).not.toHaveBeenCalled()
+
+        await wrapper.setProps({ active: true })
+        await settle()
+
+        expect(renderOptHistMock).toHaveBeenCalledTimes(1)
+        expect(renderOptHistMock.mock.calls[0][2]).toHaveLength(1)
+    })
 
     it('rerenders when allRes changes', async () => {
         mountComponent()
