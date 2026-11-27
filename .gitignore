@@ -46,8 +46,6 @@ temp/
 .bash_history
 .python_history
 
-*.spec.ts
-
 # Internal debug tooling
 docker-compose.debug.yml
 brise_debug.sh

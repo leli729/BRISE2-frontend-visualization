@@ -5,6 +5,9 @@
     "types": [
       "vite/client"
     ],
+    "paths": {
+      "@/*": ["./src/*"]
+    },
     /* Linting */
     "noUnusedLocals": false,
     "noUnusedParameters": true,

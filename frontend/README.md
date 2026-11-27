@@ -9,8 +9,7 @@
 - **Charts:** modular `plotly.js` (only the core plus the trace types actually used are registered), lazy-loaded
   through `entities/main` into its own chunk
 - **Build tool:** Vite
-- **Testing:** Vitest + `@vue/test-utils` (jsdom environment) for unit tests, plus Vitest Browser Mode
-  (Playwright/Chromium) for the chart runtime benchmarks
+- **Testing:** Vitest + `@vue/test-utils` (jsdom environment) for unit tests
 - **Architecture:** Feature-Sliced Design (FSD) — layer boundaries enforced via `eslint-plugin-boundaries`
 
 ## Requirements
@@ -51,7 +50,6 @@ The app will be available at the local Vite dev server URL (printed in the termi
 | `npm run lint` | Lint with ESLint (`eslint .`) |
 | `npm run test` | Run the unit test suite in watch mode |
 | `npm run test:run` | Run the unit test suite once |
-| `npm run bench` | Run the chart runtime benchmarks (Vitest Browser Mode); needs a one-time `npx playwright install chromium` |
 
 FSD layer-boundary rules are enforced via `eslint.config.ts` (using `eslint-plugin-boundaries`) and are
 checked both by `npm run lint` and automatically by IDEs with ESLint integration.
@@ -69,12 +67,14 @@ src/
 ├── features/          # user-facing features (e.g. download-popup)
 ├── widgets/            # composed UI blocks built from entities/features (e.g. charts, launch control bar, info board)
 ├── shared/               # generic, domain-agnostic utilities
-├── tests/                # unit tests (test setup / shared test utilities, plus `tests_frontend_visualization/`
-│                           for the chart widgets)
-├── benchmarks/           # chart runtime benchmarks, run separately via `npm run bench`
+├── tests/setup/          # global setup of the unit test project (e.g. the ResizeObserver stub)
 ├── App.vue
 └── main.ts
 ```
+
+Unit tests sit next to the code they test, in a `tests/` folder of its slice (`widgets/charts/rank/tests/render.spec.ts`
+tests `widgets/charts/rank/render.ts`); a spec is named after the file it tests, and the helpers of several specs of a
+folder are in its `tests/support/`. Specs import the unit under test through the `@/` alias (`src/`).
 
 Layer dependency rules (which layer may import from which) are enforced via `eslint-plugin-boundaries` — see the ESLint config for the exact ruleset.
 

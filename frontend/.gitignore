@@ -27,5 +27,3 @@ stats.html
 *.sln
 *.sw?
 *.csv
-!src/tests/**/*.spec.ts
-!src/benchmarks/*.spec.ts
